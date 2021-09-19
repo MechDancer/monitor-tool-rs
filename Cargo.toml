@@ -6,5 +6,6 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 readme = "README.md"
 
 [dependencies]
-iced = {version = "0.3", features = ["glow", "glow_canvas", "async-std"]}
-rand = "*"
+iced = {version = "*", features = ["glow", "glow_canvas", "async-std"]}
+iced_native = "*"
+iced_graphics = "*"

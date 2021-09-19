@@ -1,5 +1,5 @@
 ﻿use iced::{Canvas, Sandbox, Settings};
-use monitor_tool::*;
+use monitor_tool::canvas2d::*;
 
 fn main() -> iced::Result {
     Main::run(Settings {
