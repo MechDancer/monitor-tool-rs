@@ -1934,9 +1934,9 @@ dependencies = [
 name = "monitor-tool"
 version = "0.1.0"
 dependencies = [
+ "async-std",
+ "futures",
  "iced",
- "iced_graphics",
- "iced_native",
 ]
 
 [[package]]
@@ -3232,9 +3232,9 @@ dependencies = [
 
 [[package]]
 name = "x11-dl"
-version = "2.18.5"
+version = "2.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bf981e3a5b3301209754218f962052d4d9ee97e478f4d26d4a6eced34c1fef8"
+checksum = "7eab1e810da9042813865ebe3477261aa77d1f2241f6be747ef8c0e442bc1fa3"
 dependencies = [
  "lazy_static",
  "libc",
