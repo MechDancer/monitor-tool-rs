@@ -18,14 +18,14 @@ impl Sandbox for Main {
     }
 
     fn title(&self) -> String {
-        String::from("绘图工具")
+        String::from("Plot1")
     }
 
     fn update(&mut self, _: Self::Message) {}
 
     fn view(&mut self) -> iced::Element<'_, Self::Message> {
         use iced::Length::Fill;
-        Canvas::new(DrawState::default())
+        Canvas::new(DrawState::new("Plot1"))
             .width(Fill)
             .height(Fill)
             .into()

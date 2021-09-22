@@ -24,11 +24,7 @@ pub mod input {
     pub struct Topic<'a> {
         pub title: &'a str,
         pub topic: &'a str,
-        pub pose: Pose,
-        pub size: usize,
-        pub clear: bool,
-        pub display: bool,
-        pub connecting: bool,
+        pub config: &'a Config,
         pub poses: PoseInputStream<'a>,
     }
 
@@ -37,14 +33,17 @@ pub mod input {
             write!(
                 f,
                 "title: {}, topic: {}, pose: {:?}, size: {}, flags: ",
-                self.title, self.topic, self.pose, self.size,
+                self.title,
+                self.topic,
+                self.config.pose,
+                self.config.size(),
             )?;
             let mut any = false;
-            if self.clear {
+            if self.config.clear() {
                 any = true;
                 f.write_str("clear")?;
             }
-            if self.display {
+            if self.config.display() {
                 if any {
                     f.write_str(" | ")?;
                 } else {
@@ -52,7 +51,7 @@ pub mod input {
                 }
                 f.write_str("display")?;
             }
-            if self.connecting {
+            if self.config.connecting() {
                 if any {
                     f.write_str(" | ")?;
                 }
@@ -121,16 +120,10 @@ pub mod input {
             if self.buffer.is_empty() {
                 None
             } else {
-                let topic = self.slice_str();
-                let config = self.slice_config();
                 Some(Self::Item {
                     title: self.title,
-                    topic,
-                    pose: config.pose(),
-                    clear: config.clear(),
-                    display: config.display(),
-                    connecting: config.connecting(),
-                    size: config.size(),
+                    topic: self.slice_str(),
+                    config: self.slice_config(),
                     poses: self.slice_poses(),
                 })
             }
@@ -178,11 +171,7 @@ pub mod output {
         pub fn push_topic<'a>(
             &'a mut self,
             topic: &str,
-            pose: &Pose,
-            size: usize,
-            clear: bool,
-            display: bool,
-            connecting: bool,
+            config: &Config,
             default_color: Color,
         ) -> PoseOutputStream<'a> {
             let bytes = topic.as_bytes();
@@ -190,7 +179,6 @@ pub mod output {
             self.0.push(bytes.len() as u8);
             self.0.extend_from_slice(bytes);
             // push config
-            let config = Config::new(pose, size, clear, display, connecting);
             self.0.extend_from_slice(config.as_slice());
             // push size
             let begin = self.0.len();
@@ -201,6 +189,10 @@ pub mod output {
             };
             stream.push_color(default_color);
             stream
+        }
+
+        pub fn title<'a>(&'a self) -> &'a str {
+            unsafe { std::str::from_utf8_unchecked(&self.0[1..1 + (self.0[0] as usize)]) }
         }
 
         pub fn to_vec(self) -> Vec<u8> {
@@ -274,11 +266,28 @@ impl PoseOrElse {
 }
 
 #[repr(C)]
-struct Config {
+#[derive(Clone)]
+pub struct Config {
     size_low: u16,
     size_high: u8,
     flags: u8,
     pose: Pose,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::new(
+            &Pose {
+                x: 0.0,
+                y: 0.0,
+                theta: 0.0,
+            },
+            1000,
+            false,
+            true,
+            false,
+        )
+    }
 }
 
 impl Config {
@@ -302,23 +311,23 @@ impl Config {
         }
     }
 
-    fn pose(&self) -> Pose {
+    pub fn pose(&self) -> Pose {
         self.pose
     }
 
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         ((self.size_high as usize) << 16) + self.size_low as usize
     }
 
-    fn clear(&self) -> bool {
+    pub fn clear(&self) -> bool {
         self.flags & 0b001 != 0
     }
 
-    fn display(&self) -> bool {
+    pub fn display(&self) -> bool {
         self.flags & 0b010 != 0
     }
 
-    fn connecting(&self) -> bool {
+    pub fn connecting(&self) -> bool {
         self.flags & 0b100 != 0
     }
 
@@ -339,54 +348,65 @@ fn test_encode_decode() {
 
     const TITLE: &str = "title";
     const TOPIC: [&str; 2] = ["topic0", "topic1"];
-
-    let mut output = output::FrameOutputStream::new(TITLE);
-    let mut topic0 = output.push_topic(
-        TOPIC[0],
-        &Pose {
+    const POSES: [Pose; 2] = [
+        Pose {
+            x: 0.0,
+            y: 2.0,
+            theta: 0.0,
+        },
+        Pose {
+            x: 0.0,
+            y: -2.0,
+            theta: 0.0,
+        },
+    ];
+    const FRAME1: [Pose; 2] = [
+        Pose {
             x: 1.0,
             y: 2.0,
             theta: PI,
         },
-        1000,
-        true,
-        true,
-        false,
-        Color::BLACK,
-    );
-    topic0.push_pose(Pose {
-        x: 2.0,
-        y: -1.0,
-        theta: FRAC_PI_2,
-    });
-    let mut topic1 = output.push_topic(
-        TOPIC[1],
-        &Pose {
-            x: -1.0,
-            y: -2.0,
+        Pose {
+            x: 2.0,
+            y: -1.0,
             theta: PI,
         },
-        2000,
-        false,
-        true,
-        true,
+    ];
+    const FRAME2: [Pose; 3] = [
+        Pose {
+            x: 1.0,
+            y: 0.0,
+            theta: FRAC_PI_2,
+        },
+        Pose {
+            x: 2.0,
+            y: 0.0,
+            theta: FRAC_PI_2,
+        },
+        Pose {
+            x: 3.0,
+            y: 0.0,
+            theta: FRAC_PI_2,
+        },
+    ];
+
+    let mut output = output::FrameOutputStream::new(TITLE);
+    let mut topic = output.push_topic(
+        TOPIC[0],
+        &Config::new(&POSES[0], 1000, true, true, false),
+        Color::BLACK,
+    );
+    for pose in FRAME1 {
+        topic.push_pose(pose);
+    }
+    let mut topic = output.push_topic(
+        TOPIC[1],
+        &Config::new(&POSES[1], 2000, false, true, true),
         Color::from_rgb8(255, 0, 0),
     );
-    topic1.push_pose(Pose {
-        x: 1.0,
-        y: 0.0,
-        theta: FRAC_PI_2,
-    });
-    topic1.push_pose(Pose {
-        x: 2.0,
-        y: 0.0,
-        theta: FRAC_PI_2,
-    });
-    topic1.push_pose(Pose {
-        x: 3.0,
-        y: 0.0,
-        theta: FRAC_PI_2,
-    });
+    for pose in FRAME2 {
+        topic.push_pose(pose);
+    }
     let buffer = output.to_vec();
     // --------------------------------------
     let input = input::TopicInputStream::new(buffer.as_slice());
@@ -394,6 +414,7 @@ fn test_encode_decode() {
     for topic in input {
         assert_eq!(topic.title, TITLE);
         assert_eq!(topic.topic, TOPIC[i]);
+        assert_eq!(topic.config.pose(), POSES[i]);
         i += 1;
         println!("{}", topic);
         for (pose, color) in topic.poses {

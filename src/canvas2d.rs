@@ -1,20 +1,30 @@
-﻿use iced::{canvas::*, mouse, Color, Point, Rectangle, Size};
+﻿use std::collections::HashMap;
+
+use iced::{canvas::*, mouse, Color, Point, Rectangle, Size};
 
 const BORDER_OFFSET: Point = Point { x: 64.0, y: 32.0 };
 
-pub struct DrawState {
+pub struct DrawState<'a> {
     border_cache: Cache,
+    title: &'a str,
+    topics: HashMap<String, ()>,
 }
 
-impl Default for DrawState {
-    fn default() -> Self {
-        Self {
+impl<'a> DrawState<'a> {
+    pub fn new(title: &'a str) -> Self {
+        DrawState {
             border_cache: Default::default(),
+            title,
+            topics: Default::default(),
         }
+    }
+
+    pub fn title(&self) -> &'a str {
+        self.title
     }
 }
 
-impl<Message> Program<Message> for DrawState {
+impl<Message> Program<Message> for DrawState<'_> {
     fn draw(&self, bounds: iced::Rectangle, cursor: Cursor) -> Vec<Geometry> {
         let mut frame = Frame::new(bounds.size());
 

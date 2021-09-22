@@ -9,3 +9,4 @@ readme = "README.md"
 iced = {version = "*", features = ["glow", "glow_canvas", "async-std"]}
 futures = "*"
 async-std = "*"
+rand = "*"
