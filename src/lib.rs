@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use iced::Color;
 use protocol::{output::FrameOutputStream, Config};
 
-struct Painter {
+pub struct Painter {
     stream: FrameOutputStream,
     config: HashMap<String, (Config, Color)>,
 }
@@ -19,6 +19,12 @@ pub struct Pose {
     pub x: f32,
     pub y: f32,
     pub theta: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Point {
+    pub x: f32,
+    pub y: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -42,9 +48,7 @@ impl Painter {
     }
 
     pub fn consume(&mut self) -> Vec<u8> {
-        let mut other = FrameOutputStream::new(self.stream.title(), self.stream.mode());
-        std::mem::swap(&mut self.stream, &mut other);
-        other.to_vec()
+        self.stream.renew()
     }
 
     pub fn save_config(&mut self, topic: &str, config: Config, color: Color) {
@@ -52,25 +56,14 @@ impl Painter {
     }
 
     pub fn paint_pose(&mut self, topic: &str, poses: &[Pose]) {
-        let (config, color) = match self.config.get(topic) {
-            Some(c) => c.clone(),
-            None => {
-                let config = Config::default();
-                let color = Color {
-                    r: rand::random::<f32>(),
-                    g: rand::random::<f32>(),
-                    b: rand::random::<f32>(),
-                    a: rand::random::<f32>() * 0.75 + 0.25,
-                };
-                self.save_config(topic, config.clone(), color.clone());
-                (config, color)
-            }
-        };
-        let mut stream = self.stream.push_topic(topic, &config, color);
+        let (config, color) = self.get_config(topic);
+        let mut stream = self.stream.push_topic(topic, config, color);
         for p in poses {
             stream.push_pose(*p);
         }
     }
+
+    pub fn paint_polygon(&mut self, topic: &str, vertex: &[Pose]) {}
 
     pub fn paint_xy(&mut self, topic: &str, x: f32, y: f32) {
         self.paint_pose(
@@ -81,5 +74,22 @@ impl Painter {
                 theta: f32::NAN,
             }],
         )
+    }
+
+    fn get_config(&mut self, topic: &str) -> (Config, Color) {
+        match self.config.get(topic) {
+            Some(c) => c.clone(),
+            None => {
+                let config = Config::default();
+                let color = Color {
+                    r: rand::random::<f32>(),
+                    g: rand::random::<f32>(),
+                    b: rand::random::<f32>(),
+                    a: rand::random::<f32>() * 0.75 + 0.25,
+                };
+                self.save_config(topic, config, color);
+                (config, color)
+            }
+        }
     }
 }
