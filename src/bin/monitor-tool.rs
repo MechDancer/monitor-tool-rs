@@ -1,5 +1,6 @@
 ﻿use iced::{Canvas, Sandbox, Settings};
 use monitor_tool::canvas2d::*;
+use monitor_tool::{BorderMode, PolarAxis};
 
 fn main() -> iced::Result {
     Main::run(Settings {
@@ -25,7 +26,7 @@ impl Sandbox for Main {
 
     fn view(&mut self) -> iced::Element<'_, Self::Message> {
         use iced::Length::Fill;
-        Canvas::new(DrawState::new("Plot1"))
+        Canvas::new(DrawState::new("Plot1", BorderMode::Polar(PolarAxis::Top)))
             .width(Fill)
             .height(Fill)
             .into()

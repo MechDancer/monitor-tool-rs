@@ -1,4 +1,6 @@
-﻿pub mod cache2d;
+﻿extern crate nalgebra as na;
+
+pub mod cache2d;
 pub mod canvas2d;
 pub mod protocol;
 
@@ -19,16 +21,28 @@ pub struct Pose {
     pub theta: f32,
 }
 
+#[derive(Copy, Clone)]
+pub enum PolarAxis {
+    Top,
+    Left,
+}
+
+#[derive(Copy, Clone)]
+pub enum BorderMode {
+    Rectangular,
+    Polar(PolarAxis),
+}
+
 impl Painter {
-    pub fn new(title: &str) -> Self {
+    pub fn new(title: &str, mode: BorderMode) -> Self {
         Self {
-            stream: FrameOutputStream::new(title),
+            stream: FrameOutputStream::new(title, mode),
             config: HashMap::new(),
         }
     }
 
     pub fn consume(&mut self) -> Vec<u8> {
-        let mut other = FrameOutputStream::new(self.stream.title());
+        let mut other = FrameOutputStream::new(self.stream.title(), self.stream.mode());
         std::mem::swap(&mut self.stream, &mut other);
         other.to_vec()
     }
