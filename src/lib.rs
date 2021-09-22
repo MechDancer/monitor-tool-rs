@@ -21,16 +21,16 @@ pub struct Pose {
     pub theta: f32,
 }
 
-#[derive(Copy, Clone)]
-pub enum PolarAxis {
-    Top,
-    Left,
-}
-
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BorderMode {
     Rectangular,
     Polar(PolarAxis),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PolarAxis {
+    Top,
+    Left,
 }
 
 impl Painter {

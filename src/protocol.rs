@@ -30,7 +30,7 @@ pub mod input {
         pub mode: BorderMode,
         pub topic: &'a str,
         pub config: &'a Config,
-        pub poses: PoseInputStream<'a>,
+        pub items: ItemInputStream<'a>,
     }
 
     impl Display for Topic<'_> {
@@ -62,16 +62,21 @@ pub mod input {
                 }
                 f.write_str("connecting")?;
             }
-            write!(f, ", size: {}", self.poses.len())?;
+            write!(f, ", size: {}", todo!())?;
             Ok(())
         }
     }
 
     /// 可从话题解出位姿的流
-    #[derive(Debug)]
-    pub struct PoseInputStream<'a> {
+    pub enum ItemInputStream<'a> {
+        Objects(ObjectStream<'a>),
+        Poses(PoseStream<'a>),
+    }
+
+    pub struct ObjectStream<'a>(&'a [PoseOrElse]);
+    pub struct PoseStream<'a> {
         state: Color,
-        buffer: &'a [u8],
+        items: &'a [PoseOrElse],
     }
 
     impl<'a> TopicInputStream<'a> {
@@ -95,15 +100,12 @@ pub mod input {
         }
 
         /// 从流前分割一个位姿流
-        fn slice_poses(&mut self) -> PoseInputStream<'a> {
+        fn slice_items(&mut self) -> &'a [PoseOrElse] {
             let len = unsafe { *(self.buffer.as_ptr() as *const u16) } as usize;
             let end = 2 + len * sizeof!(PoseOrElse);
-            let slice = &self.buffer[2..end];
+            let ptr = (&self.buffer[2..]).as_ptr() as *const PoseOrElse;
             self.buffer = &self.buffer[end..];
-            PoseInputStream {
-                state: Default::default(),
-                buffer: slice,
-            }
+            unsafe { std::slice::from_raw_parts(ptr, len) }
         }
 
         /// 从流前分割一个话题配置
@@ -114,12 +116,12 @@ pub mod input {
         }
     }
 
-    impl PoseInputStream<'_> {
-        /// 剩余项数
-        fn len(&self) -> usize {
-            self.buffer.len() / sizeof!(PoseOrElse)
-        }
-    }
+    // impl PoseInputStream<'_> {
+    //     /// 剩余项数
+    //     fn len(&self) -> usize {
+    //         self.buffer.len() / sizeof!(PoseOrElse)
+    //     }
+    // }
 
     impl<'a> Iterator for TopicInputStream<'a> {
         type Item = Topic<'a>;
@@ -128,28 +130,60 @@ pub mod input {
             if self.buffer.is_empty() {
                 None
             } else {
+                let title = self.title;
+                let mode = self.mode;
+                let topic = self.slice_str();
+                let config = self.slice_config();
+                let objective = config.object_mode();
+                let items = self.slice_items();
                 Some(Self::Item {
-                    title: self.title,
-                    mode: self.mode,
-                    topic: self.slice_str(),
-                    config: self.slice_config(),
-                    poses: self.slice_poses(),
+                    title,
+                    mode,
+                    topic,
+                    config,
+                    items: if objective {
+                        ItemInputStream::Objects(ObjectStream(items))
+                    } else {
+                        ItemInputStream::Poses(PoseStream {
+                            state: Default::default(),
+                            items,
+                        })
+                    },
                 })
             }
         }
     }
 
-    impl<'a> Iterator for PoseInputStream<'a> {
+    impl<'a> Iterator for ObjectStream<'a> {
+        type Item = (&'a [Pose], Color);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.0.is_empty() || self.0[0].is_pose() {
+                return None;
+            }
+            let color = self.0[0].color();
+            for i in 1..self.0.len() {
+                if !self.0[i].is_pose() {
+                    let ptr = (&self.0[1..i]).as_ptr() as *const Pose;
+                    self.0 = &self.0[i..];
+                    return Some((unsafe { std::slice::from_raw_parts(ptr, i - 1) }, color));
+                }
+            }
+            None
+        }
+    }
+
+    impl<'a> Iterator for PoseStream<'a> {
         type Item = (Pose, Color);
 
         fn next(&mut self) -> Option<Self::Item> {
-            while !self.buffer.is_empty() {
-                let pose_or_else = unsafe { *(self.buffer.as_ptr() as *const PoseOrElse) };
-                self.buffer = &self.buffer[sizeof!(PoseOrElse)..];
-                if pose_or_else.is_pose() {
-                    return Some((pose_or_else.pose(), self.state));
+            while !self.items.is_empty() {
+                let item = self.items[0];
+                self.items = &self.items[1..];
+                if item.is_pose() {
+                    return Some((item.pose(), self.state));
                 } else {
-                    self.state = pose_or_else.color()
+                    self.state = item.color();
                 }
             }
             None
@@ -176,7 +210,7 @@ pub mod output {
             let bytes = title.as_bytes();
             let mut buffer = vec![0u8; 1 + bytes.len() + sizeof!(BorderMode)];
             buffer[0] = bytes.len() as u8;
-            buffer[1..].copy_from_slice(bytes);
+            buffer[1..bytes.len() + 1].copy_from_slice(bytes);
             unsafe { *(buffer[1 + bytes.len()..].as_ptr() as *mut BorderMode) = mode };
             Self(buffer)
         }
@@ -303,6 +337,7 @@ impl Default for Config {
             },
             1000,
             false,
+            false,
             true,
             false,
         )
@@ -310,16 +345,26 @@ impl Default for Config {
 }
 
 impl Config {
-    fn new(pose: &Pose, size: usize, clear: bool, display: bool, connecting: bool) -> Self {
+    fn new(
+        pose: &Pose,
+        size: usize,
+        object_mode: bool,
+        clear: bool,
+        display: bool,
+        connecting: bool,
+    ) -> Self {
         let mut flags = 0u8;
+        if object_mode {
+            flags |= 0b0001;
+        }
         if clear {
-            flags |= 0b001;
+            flags |= 0b0010;
         }
         if display {
-            flags |= 0b010;
+            flags |= 0b0100;
         }
         if connecting {
-            flags |= 0b100;
+            flags |= 0b1000;
         }
 
         Self {
@@ -338,16 +383,20 @@ impl Config {
         ((self.size_high as usize) << 16) + self.size_low as usize
     }
 
+    pub fn object_mode(&self) -> bool {
+        self.flags & 0b0001 != 0
+    }
+
     pub fn clear(&self) -> bool {
-        self.flags & 0b001 != 0
+        self.flags & 0b0010 != 0
     }
 
     pub fn display(&self) -> bool {
-        self.flags & 0b010 != 0
+        self.flags & 0b0100 != 0
     }
 
     pub fn connecting(&self) -> bool {
-        self.flags & 0b100 != 0
+        self.flags & 0b1000 != 0
     }
 
     fn as_slice<'a>(&self) -> &'a [u8] {
@@ -414,7 +463,7 @@ fn test_encode_decode() {
     let mut output = output::FrameOutputStream::new(TITLE, MODE);
     let mut topic = output.push_topic(
         TOPIC[0],
-        &Config::new(&POSES[0], 1000, true, true, false),
+        &Config::new(&POSES[0], 1000, false, true, true, false),
         Color::BLACK,
     );
     for pose in FRAME1 {
@@ -422,7 +471,7 @@ fn test_encode_decode() {
     }
     let mut topic = output.push_topic(
         TOPIC[1],
-        &Config::new(&POSES[1], 2000, false, true, true),
+        &Config::new(&POSES[1], 2000, false, false, true, true),
         Color::from_rgb8(255, 0, 0),
     );
     for pose in FRAME2 {
@@ -438,9 +487,18 @@ fn test_encode_decode() {
         assert_eq!(topic.topic, TOPIC[i]);
         assert_eq!(topic.config.pose(), POSES[i]);
         i += 1;
-        println!("{}", topic);
-        for (pose, color) in topic.poses {
-            println!("({:?}) {:?}", color, pose);
+        // println!("{}", topic);
+        match topic.items {
+            input::ItemInputStream::Objects(stream) => {
+                for (pose, color) in stream {
+                    println!("({:?}) {:?}", color, pose);
+                }
+            }
+            input::ItemInputStream::Poses(stream) => {
+                for (pose, color) in stream {
+                    println!("({:?}) {:?}", color, pose);
+                }
+            }
         }
     }
 }
