@@ -44,8 +44,16 @@ pub mod input {
                 self.config.size(),
             )?;
             let mut any = false;
-            if self.config.clear() {
+            if self.config.object_mode() {
                 any = true;
+                f.write_str("object")?;
+            }
+            if self.config.clear() {
+                if any {
+                    f.write_str(" | ")?;
+                } else {
+                    any = true;
+                }
                 f.write_str("clear")?;
             }
             if self.config.display() {
@@ -62,21 +70,9 @@ pub mod input {
                 }
                 f.write_str("connecting")?;
             }
-            write!(f, ", size: {}", todo!())?;
+            write!(f, ", size: {}", self.items.len())?;
             Ok(())
         }
-    }
-
-    /// 可从话题解出位姿的流
-    pub enum ItemInputStream<'a> {
-        Objects(ObjectStream<'a>),
-        Poses(PoseStream<'a>),
-    }
-
-    pub struct ObjectStream<'a>(&'a [PoseOrElse]);
-    pub struct PoseStream<'a> {
-        state: Color,
-        items: &'a [PoseOrElse],
     }
 
     impl<'a> TopicInputStream<'a> {
@@ -116,12 +112,26 @@ pub mod input {
         }
     }
 
-    // impl PoseInputStream<'_> {
-    //     /// 剩余项数
-    //     fn len(&self) -> usize {
-    //         self.buffer.len() / sizeof!(PoseOrElse)
-    //     }
-    // }
+    /// 可从话题解出位姿的流
+    pub enum ItemInputStream<'a> {
+        Objects(ObjectStream<'a>),
+        Poses(PoseStream<'a>),
+    }
+
+    pub struct ObjectStream<'a>(&'a [PoseOrElse]);
+    pub struct PoseStream<'a> {
+        state: Color,
+        items: &'a [PoseOrElse],
+    }
+
+    impl ItemInputStream<'_> {
+        fn len(&self) -> usize {
+            match self {
+                ItemInputStream::Objects(stream) => stream.0.len(),
+                ItemInputStream::Poses(stream) => stream.items.len(),
+            }
+        }
+    }
 
     impl<'a> Iterator for TopicInputStream<'a> {
         type Item = Topic<'a>;
@@ -487,7 +497,7 @@ fn test_encode_decode() {
         assert_eq!(topic.topic, TOPIC[i]);
         assert_eq!(topic.config.pose(), POSES[i]);
         i += 1;
-        // println!("{}", topic);
+        println!("{}", topic);
         match topic.items {
             input::ItemInputStream::Objects(stream) => {
                 for (pose, color) in stream {
