@@ -3,27 +3,23 @@ use iced::{canvas::*, mouse, Color, Point, Rectangle, Size};
 
 const BORDER_OFFSET: Point = Point { x: 64.0, y: 32.0 };
 
-pub struct DrawState<'a> {
-    border_cache: Cache,
-    title: &'a str,
+pub struct Figure {
     border_mode: BorderMode,
+
+    border_cache: Cache,
 }
 
-impl<'a> DrawState<'a> {
-    pub fn new(title: &'a str, border_mode: BorderMode) -> Self {
-        DrawState {
-            border_cache: Default::default(),
-            title,
+impl Figure {
+    pub fn new(border_mode: BorderMode) -> Self {
+        Figure {
             border_mode,
+
+            border_cache: Default::default(),
         }
     }
-
-    pub fn title(&self) -> &'a str {
-        self.title
-    }
 }
 
-impl<Message> Program<Message> for DrawState<'_> {
+impl<Message> Program<Message> for Figure {
     fn draw(&self, bounds: iced::Rectangle, cursor: Cursor) -> Vec<Geometry> {
         let mut frame = Frame::new(bounds.size());
 
