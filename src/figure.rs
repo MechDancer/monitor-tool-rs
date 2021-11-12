@@ -1,4 +1,6 @@
-﻿use std::{
+﻿use iced::Color;
+use nalgebra::Vector2;
+use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     net::IpAddr,
@@ -14,6 +16,12 @@ pub struct Figure {
     topics: HashMap<TopicTitle, TopicContent>,
     layers: HashMap<String, HashSet<TopicTitle>>,
     sync_sets: HashMap<String, (HashSet<TopicTitle>, SyncInfo)>,
+}
+
+pub enum FigureItem {
+    Point(Vector2<f32>, Color),
+    Arrow(Vector2<f32>, f32, Color),
+    Tie(Vector2<f32>, Vector2<f32>, Color),
 }
 
 /// 同步信息

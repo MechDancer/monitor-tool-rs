@@ -1,4 +1,5 @@
-﻿use iced::Color;
+﻿use super::FigureItem;
+use iced::Color;
 use nalgebra::Vector2;
 use std::{
     collections::{vec_deque::Iter, HashMap, VecDeque},
@@ -14,18 +15,14 @@ pub struct TopicContent {
     color_map: HashMap<u8, Color>,     // 色彩映射
 }
 
-pub struct Points<'a> {
+/// 产生绘图对象的迭代器
+pub struct Items<'a> {
     memory: IterMemory,
     iter: Iter<'a, (Instant, Point)>,
     color_map: &'a HashMap<u8, Color>,
 }
 
-pub enum FigureItem {
-    Point(Vector2<f32>, Color),
-    Arrow(Vector2<f32>, f32, Color),
-    Tie(Vector2<f32>, Vector2<f32>, Color),
-}
-
+/// 迭代绘图缓存
 enum IterMemory {
     Point(Vector2<f32>, f32, Color),
     Position(Vector2<f32>),
@@ -40,13 +37,13 @@ struct Point {
 }
 
 impl TopicContent {
-    pub fn update_from_this(&self, time: Instant) -> bool {
+    pub fn check_update(&self, time: Instant) -> bool {
         time < self.timestamp
     }
 
-    pub fn upgrade_from_this<'a>(&'a self) -> Option<Points<'a>> {
+    pub fn get_items<'a>(&'a self) -> Option<Items<'a>> {
         let mut iter = self.queue.iter();
-        iter.next().map(|(_, p)| Points {
+        iter.next().map(|(_, p)| Items {
             memory: IterMemory::Point(
                 p.pos,
                 p.dir,
@@ -99,7 +96,7 @@ impl Default for Point {
     }
 }
 
-impl<'a> Iterator for Points<'a> {
+impl<'a> Iterator for Items<'a> {
     type Item = FigureItem;
 
     fn next(&mut self) -> Option<Self::Item> {
