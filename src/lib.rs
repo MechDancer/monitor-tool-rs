@@ -1,6 +1,4 @@
-﻿extern crate nalgebra as na;
-
-pub mod canvas2d;
+﻿pub mod canvas2d;
 mod figure;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

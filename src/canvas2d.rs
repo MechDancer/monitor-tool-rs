@@ -1,5 +1,6 @@
 ﻿use super::{BorderMode, PolarAxis};
 use iced::{canvas::*, mouse, Color, Point, Rectangle, Size};
+use nalgebra::Vector2;
 
 const BORDER_OFFSET: Point = Point { x: 64.0, y: 32.0 };
 
@@ -159,8 +160,8 @@ fn mark_polar(frame: &mut Frame, p: Point, axis: PolarAxis) {
         width: w,
         height: h,
     } = frame.size();
-    let p = na::Vector2::new(p.x, p.y);
-    let c = na::Vector2::new(w / 2.0, h / 2.0);
+    let p = Vector2::new(p.x, p.y);
+    let c = Vector2::new(w / 2.0, h / 2.0);
     let d = p - c;
     let u = d.normalize();
     let r = radius(frame.size());

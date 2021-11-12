@@ -1,32 +1,32 @@
-﻿use iced::Color;
-use std::{
-    collections::{HashMap, VecDeque},
+﻿use std::{
+    collections::{HashMap, HashSet},
     fmt::Display,
     net::IpAddr,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
+mod content;
+
+pub use content::TopicContent;
+
+/// 画面
+pub struct Figure {
+    topics: HashMap<TopicTitle, TopicContent>,
+    layers: HashMap<String, HashSet<TopicTitle>>,
+    sync_sets: HashMap<String, (HashSet<TopicTitle>, SyncInfo)>,
+}
+
+/// 同步信息
+pub struct SyncInfo {
+    max_size: usize,
+    life_time: Duration,
+}
+
 /// 话题标题，用于区分话题
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct TopicTitle {
     title: String,
     source: IpAddr,
-}
-
-/// 话题内容，用于存储话题状态
-#[derive(Default)]
-pub struct TopicContent {
-    queue: VecDeque<(Instant, Point)>,
-    color_map: HashMap<u8, Color>,
-}
-
-/// 图形顶点
-pub struct Point {
-    x: f32,
-    y: f32,
-    theta: f32,
-    level: u8,
-    tie: bool,
 }
 
 impl Display for TopicTitle {
@@ -35,7 +35,28 @@ impl Display for TopicTitle {
     }
 }
 
-#[test]
-fn assert_size() {
-    assert_eq!(16, std::mem::size_of::<Point>());
+impl Figure {
+    /// 限时限量同步
+    fn sync(&mut self, set: String, now: Instant) {
+        let (set, info) = &self.sync_sets[&set];
+        // 按当前时间计算期限
+        let deadline0 = now.checked_sub(info.life_time);
+        // 按数量消除并计算期限
+        let deadline1 = set
+            .iter()
+            .filter_map(|t| self.topics.get_mut(t).unwrap().sync_by_size(info.max_size))
+            .min();
+        // 合并期限
+        if let Some(deadline) = match (deadline0, deadline1) {
+            (None, None) => None,
+            (Some(t), None) => Some(t),
+            (None, Some(t)) => Some(t),
+            (Some(t0), Some(t1)) => Some(std::cmp::min(t0, t1)),
+        } {
+            // 按期限消除
+            for t in set {
+                self.topics.get_mut(t).unwrap().sync_by_time(deadline)
+            }
+        }
+    }
 }
