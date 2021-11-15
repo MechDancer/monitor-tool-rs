@@ -21,6 +21,14 @@ pub struct TopicContent {
     cache: TopicCache, // 话题的完整缓存
 }
 
+/// 图形顶点
+pub struct Vertex {
+    pos: Point,
+    dir: f32,
+    level: u8,
+    tie: bool,
+}
+
 /// 产生绘图对象的迭代器
 struct Items<'a> {
     memory: IterMemory,
@@ -29,6 +37,7 @@ struct Items<'a> {
 }
 
 /// 单个绘图对象
+#[derive(Clone, Copy)]
 enum FigureItem {
     Point(Point, Color),
     Arrow(Point, f32, Color),
@@ -39,14 +48,6 @@ enum FigureItem {
 enum IterMemory {
     Vertex(Point, f32, Color),
     Position(Point),
-}
-
-/// 图形顶点
-struct Vertex {
-    pos: Point,
-    dir: f32,
-    level: u8,
-    tie: bool,
 }
 
 macro_rules! get_or_set {
@@ -62,8 +63,8 @@ impl TopicContent {
     /// 画图
     pub fn draw(&mut self) -> Option<Geometry> {
         let mut iter = self.queue.iter();
-        iter.next()
-            .map(|(_, v)| Items {
+        iter.next().map(|(_, v)| {
+            self.cache.draw(Items {
                 memory: IterMemory::Vertex(
                     v.pos,
                     v.dir,
@@ -72,7 +73,7 @@ impl TopicContent {
                 iter,
                 color_map: &mut self.color_map,
             })
-            .map(|items| self.cache.draw(items))
+        })
     }
 
     /// 设置队列容量
@@ -105,6 +106,17 @@ impl TopicContent {
     /// 计算关注范围
     pub fn bound(&mut self) -> Option<AABB> {
         self.cache.bound(self.queue.iter().map(|(_, v)| v.pos))
+    }
+
+    /// 向队列添加一点
+    pub fn push(&mut self, time: Instant, v: impl Iterator<Item = Vertex>) {
+        for v in v {
+            if self.queue.len() >= self.capacity {
+                self.queue.pop_back();
+            }
+            self.queue.push_front((time, v));
+        }
+        self.cache.clear();
     }
 
     /// 依时间范围同步

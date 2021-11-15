@@ -1,6 +1,6 @@
 ﻿use super::{FigureItem, Items, AABB};
 use iced::{
-    canvas::{Cache, Geometry},
+    canvas::{Cache, Geometry, Path, Stroke},
     Point, Size, Vector,
 };
 
@@ -84,16 +84,43 @@ impl TopicCache {
             translation,
             scale,
         } = self.config;
-        self.cache.draw(size, move |frame| {
+        let items = items.collect::<Vec<_>>();
+        self.cache.draw(size, |frame| {
             frame.translate(translation);
             frame.scale(scale);
 
             use FigureItem::*;
-            for item in items {
+            for item in items.iter().copied() {
                 match item {
-                    Point(p, color) => {}
-                    Arrow(p, d, color) => {}
-                    Tie(p0, p1, color) => {}
+                    Point(p, color) => {
+                        frame.fill(&Path::circle(p, 1.0), color);
+                    }
+                    Arrow(p, d, color) => {
+                        let (sin, cos) = d.sin_cos();
+                        let d = Vector {
+                            x: cos * 10.0,
+                            y: sin * 10.0,
+                        };
+                        frame.fill(&Path::circle(p, 1.0), color);
+                        frame.stroke(
+                            &Path::line(p, p + d),
+                            Stroke {
+                                color,
+                                width: 1.0,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    Tie(p0, p1, color) => {
+                        frame.stroke(
+                            &Path::line(p0, p1),
+                            Stroke {
+                                color,
+                                width: 1.0,
+                                ..Default::default()
+                            },
+                        );
+                    }
                 }
             }
         })

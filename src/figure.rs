@@ -1,4 +1,4 @@
-﻿use iced::{Color, Point, Rectangle};
+﻿use iced::{canvas::Geometry, Color, Point, Rectangle, Size};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -32,6 +32,11 @@ impl Display for TopicTitle {
 }
 
 impl Figure {
+    pub fn draw(&mut self, now: Instant, bound: Size) -> Vec<Geometry> {
+        self.sync(now);
+        todo!()
+    }
+
     /// 同步
     fn sync(&mut self, now: Instant) {
         for (set, life_time) in self.sync_sets.values_mut() {
