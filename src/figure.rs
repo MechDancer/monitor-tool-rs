@@ -18,12 +18,6 @@ pub struct Figure {
     sync_sets: HashMap<String, (HashSet<TopicTitle>, Duration)>,
 }
 
-pub enum FigureItem {
-    Point(Point, Color),
-    Arrow(Point, f32, Color),
-    Tie(Point, Point, Color),
-}
-
 /// 话题标题，用于区分话题
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct TopicTitle {

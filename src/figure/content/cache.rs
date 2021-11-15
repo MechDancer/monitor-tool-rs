@@ -1,13 +1,23 @@
-﻿use super::AABB;
-use iced::{Point, Vector};
-use iced_graphics::Primitive;
+﻿use super::{FigureItem, Items, AABB};
+use iced::{
+    canvas::{Cache, Geometry},
+    Point, Size, Vector,
+};
 
 #[derive(Default)]
 pub(super) struct TopicCache {
     focus_len: usize,
-
     bound: Bound,
-    primitive: Option<(Vector, f32, Primitive)>,
+
+    config: Config,
+    cache: Cache,
+}
+
+#[derive(PartialEq)]
+pub(super) struct Config {
+    size: Size,
+    translation: Vector,
+    scale: f32,
 }
 
 enum Bound {
@@ -21,6 +31,23 @@ impl Default for Bound {
     fn default() -> Self {
         Self::Invalid
     }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl Config {
+    const DEFAULT: Self = Self {
+        size: Size {
+            width: 640.0,
+            height: 480.0,
+        },
+        translation: Vector { x: 0.0, y: 0.0 },
+        scale: 1.0,
+    };
 }
 
 impl TopicCache {
@@ -50,6 +77,28 @@ impl TopicCache {
         }
     }
 
+    /// 画图
+    pub fn draw(&mut self, items: Items) -> Geometry {
+        let Config {
+            size,
+            translation,
+            scale,
+        } = self.config;
+        self.cache.draw(size, move |frame| {
+            frame.translate(translation);
+            frame.scale(scale);
+
+            use FigureItem::*;
+            for item in items {
+                match item {
+                    Point(p, color) => {}
+                    Arrow(p, d, color) => {}
+                    Tie(p0, p1, color) => {}
+                }
+            }
+        })
+    }
+
     #[inline]
     pub fn set_focus(&mut self, len: usize) {
         if self.focus_len != len {
@@ -59,14 +108,22 @@ impl TopicCache {
     }
 
     #[inline]
-    pub fn redraw(&mut self) {
-        self.primitive = None;
+    pub fn set_config(&mut self, config: Config) {
+        if self.config != config {
+            self.config = config;
+            self.redraw();
+        }
     }
 
     #[inline]
     pub fn clear(&mut self) {
         self.rebound();
         self.redraw();
+    }
+
+    #[inline]
+    pub fn redraw(&mut self) {
+        self.cache.clear();
     }
 
     #[inline]

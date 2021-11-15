@@ -1,7 +1,7 @@
-﻿use super::{aabb::AABB, FigureItem};
-use iced::{canvas::Geometry, Color, Point, Size};
+﻿use super::aabb::AABB;
+use iced::{canvas::Geometry, Color, Point};
 use std::{
-    collections::{vec_deque::Iter, HashMap, VecDeque},
+    collections::{hash_map::Entry, vec_deque::Iter, HashMap, VecDeque},
     time::Instant,
 };
 
@@ -18,14 +18,21 @@ pub struct TopicContent {
     queue: VecDeque<(Instant, Vertex)>, // 点数据
     color_map: HashMap<u8, Color>,      // 色彩映射
 
-    cache: TopicCache,
+    cache: TopicCache, // 话题的完整缓存
 }
 
 /// 产生绘图对象的迭代器
-pub struct Items<'a> {
+struct Items<'a> {
     memory: IterMemory,
     iter: Iter<'a, (Instant, Vertex)>,
-    color_map: &'a HashMap<u8, Color>,
+    color_map: &'a mut HashMap<u8, Color>,
+}
+
+/// 单个绘图对象
+enum FigureItem {
+    Point(Point, Color),
+    Arrow(Point, f32, Color),
+    Tie(Point, Point, Color),
 }
 
 /// 迭代绘图缓存
@@ -42,27 +49,35 @@ struct Vertex {
     tie: bool,
 }
 
-impl TopicContent {
-    pub fn draw(&mut self, bounds: Size) -> Geometry {
-        let mut iter = self.queue.iter();
-        if let Some(items) = iter.next().map(|(_, v)| Items {
-            memory: IterMemory::Vertex(
-                v.pos,
-                v.dir,
-                self.color_map.get(&v.level).map_or(Color::BLACK, |c| *c),
-            ),
-            iter,
-            color_map: &self.color_map,
-        }) {
-            todo!()
-        } else {
-            todo!()
+macro_rules! get_or_set {
+    ($map:expr, $key:expr, $default:expr) => {
+        match $map.entry($key) {
+            Entry::<_, _>::Occupied(entry) => *entry.get(),
+            Entry::<_, _>::Vacant(entry) => *entry.insert($default),
         }
+    };
+}
+
+impl TopicContent {
+    /// 画图
+    pub fn draw(&mut self) -> Option<Geometry> {
+        let mut iter = self.queue.iter();
+        iter.next()
+            .map(|(_, v)| Items {
+                memory: IterMemory::Vertex(
+                    v.pos,
+                    v.dir,
+                    get_or_set!(self.color_map, v.level, Color::BLACK),
+                ),
+                iter,
+                color_map: &mut self.color_map,
+            })
+            .map(|items| self.cache.draw(items))
     }
 
     /// 设置队列容量
     pub fn set_capacity(&mut self, len: usize) {
-        if len != self.capacity {
+        if self.capacity != len {
             self.capacity = len;
             if self.queue.len() > len {
                 self.truncate(len);
@@ -75,6 +90,13 @@ impl TopicContent {
         self.cache.set_focus(len);
     }
 
+    /// 设置级别颜色
+    pub fn set_color(&mut self, i: u8, color: Color) {
+        if Some(color) != self.color_map.insert(i, color) {
+            self.cache.redraw();
+        }
+    }
+
     /// 获取时间范围
     pub fn begin(&self) -> Option<Instant> {
         self.queue.back().map(|(t, _)| *t)
@@ -85,7 +107,7 @@ impl TopicContent {
         self.cache.bound(self.queue.iter().map(|(_, v)| v.pos))
     }
 
-    /// 依最时间范围同步
+    /// 依时间范围同步
     pub fn sync(&mut self, deadline: Instant) {
         let to_remove = self
             .queue
@@ -131,7 +153,7 @@ impl<'a> Iterator for Items<'a> {
                 }
             }
             IterMemory::Position(p0) => self.iter.next().map(|(_, p)| {
-                let color = self.color_map.get(&p.level).map_or(Color::BLACK, |c| *c);
+                let color = get_or_set!(self.color_map, p.level, Color::BLACK);
                 if p.tie {
                     self.memory = IterMemory::Vertex(p.pos, p.dir, color);
                     FigureItem::Tie(p0, p.pos, color)
