@@ -1,6 +1,5 @@
 ﻿use super::{BorderMode, PolarAxis};
-use iced::{canvas::*, mouse, Color, Point, Rectangle, Size};
-use nalgebra::Vector2;
+use iced::{canvas::*, mouse, Color, Point, Rectangle, Size, Vector};
 
 const BORDER_OFFSET: Point = Point { x: 64.0, y: 32.0 };
 
@@ -22,8 +21,6 @@ impl Figure {
 
 impl<Message> Program<Message> for Figure {
     fn draw(&self, bounds: iced::Rectangle, cursor: Cursor) -> Vec<Geometry> {
-        let mut frame = Frame::new(bounds.size());
-
         let border = self.border_cache.draw(bounds.size(), |frame| {
             let Size {
                 width: w,
@@ -56,6 +53,7 @@ impl<Message> Program<Message> for Figure {
             );
         });
 
+        let mut frame = Frame::new(bounds.size());
         if let Cursor::Available(p) = cursor {
             match self.border_mode {
                 BorderMode::Rectangular => mark_cross(&mut frame, p),
@@ -160,10 +158,11 @@ fn mark_polar(frame: &mut Frame, p: Point, axis: PolarAxis) {
         width: w,
         height: h,
     } = frame.size();
-    let p = Vector2::new(p.x, p.y);
-    let c = Vector2::new(w / 2.0, h / 2.0);
+    let p = Point::new(p.x, p.y);
+    let c = Vector::new(w / 2.0, h / 2.0);
     let d = p - c;
-    let u = d.normalize();
+    let len = d.x.hypot(d.y);
+    let u = Vector::new(d.x / len, d.y / len);
     let r = radius(frame.size());
     let v = u * r + c;
 
@@ -215,7 +214,7 @@ fn mark_polar(frame: &mut Frame, p: Point, axis: PolarAxis) {
             });
         }
     }
-    let rho = d.norm();
+    let rho = d.x.hypot(d.y);
     if rho < r {
         let text = Text {
             content: format!("{:.2}", rho),

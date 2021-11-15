@@ -1,6 +1,5 @@
 ﻿use super::FigureItem;
-use iced::Color;
-use nalgebra::Vector2;
+use iced::{canvas::Geometry, Color, Point, Rectangle, Size};
 use std::{
     collections::{vec_deque::Iter, HashMap, VecDeque},
     time::Instant,
@@ -10,40 +9,41 @@ use std::{
 pub struct TopicContent {
     sync_set: String,
 
-    timestamp: Instant,                // 最后更新时间
-    queue: VecDeque<(Instant, Point)>, // 点数据
-    color_map: HashMap<u8, Color>,     // 色彩映射
+    queue: VecDeque<(Instant, Vertex)>, // 点数据
+    color_map: HashMap<u8, Color>,      // 色彩映射
+}
+
+pub enum FocusMode {
+    All(Rectangle),
+    Last(Point),
+    Background,
 }
 
 /// 产生绘图对象的迭代器
 pub struct Items<'a> {
     memory: IterMemory,
-    iter: Iter<'a, (Instant, Point)>,
+    iter: Iter<'a, (Instant, Vertex)>,
     color_map: &'a HashMap<u8, Color>,
 }
 
 /// 迭代绘图缓存
 enum IterMemory {
-    Point(Vector2<f32>, f32, Color),
-    Position(Vector2<f32>),
+    Point(Point, f32, Color),
+    Position(Point),
 }
 
 /// 图形顶点
-struct Point {
-    pos: Vector2<f32>,
+struct Vertex {
+    pos: Point,
     dir: f32,
     level: u8,
     tie: bool,
 }
 
 impl TopicContent {
-    pub fn check_update(&self, time: Instant) -> bool {
-        time < self.timestamp
-    }
-
-    pub fn get_items<'a>(&'a self) -> Option<Items<'a>> {
+    pub fn draw(&mut self, bounds: Size) -> Geometry {
         let mut iter = self.queue.iter();
-        iter.next().map(|(_, p)| Items {
+        if let Some(items) = iter.next().map(|(_, p)| Items {
             memory: IterMemory::Point(
                 p.pos,
                 p.dir,
@@ -51,13 +51,17 @@ impl TopicContent {
             ),
             iter,
             color_map: &self.color_map,
-        })
+        }) {
+            todo!()
+        } else {
+            todo!()
+        }
     }
 
     /// 移除到最大存量，返回剩余点的最早时间
     pub fn sync_by_size(&mut self, max_len: usize) -> Option<Instant> {
         if self.queue.len() > max_len {
-            self.queue.truncate(max_len);
+            self.truncate(max_len);
         }
         self.queue.back().map(|(t, _)| *t)
     }
@@ -70,25 +74,34 @@ impl TopicContent {
             .rev()
             .take_while(|(t, _)| t < &deadline)
             .count();
-        self.queue.truncate(self.queue.len() - to_remove);
-    }
-}
-
-impl Default for TopicContent {
-    fn default() -> Self {
-        Self {
-            sync_set: Default::default(),
-            timestamp: Instant::now(),
-            queue: Default::default(),
-            color_map: Default::default(),
+        if to_remove > 0 {
+            self.truncate(self.queue.len() - to_remove);
         }
     }
+
+    /// 移除部分数据并使缓存失效
+    #[inline]
+    fn truncate(&mut self, len: usize) {
+        self.queue.truncate(len);
+        // clear
+    }
 }
 
-impl Default for Point {
+// impl Default for TopicContent {
+//     fn default() -> Self {
+//         Self {
+//             sync_set: Default::default(),
+//             queue: Default::default(),
+//             color_map: Default::default(),
+//             cache: Default::default(),
+//         }
+//     }
+// }
+
+impl Default for Vertex {
     fn default() -> Self {
         Self {
-            pos: Vector2::new(0.0, 0.0),
+            pos: Point::ORIGIN,
             dir: 0.0,
             level: 0,
             tie: false,

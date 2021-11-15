@@ -1,5 +1,4 @@
-﻿use iced::Color;
-use nalgebra::Vector2;
+﻿use iced::{Color, Point};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -19,9 +18,9 @@ pub struct Figure {
 }
 
 pub enum FigureItem {
-    Point(Vector2<f32>, Color),
-    Arrow(Vector2<f32>, f32, Color),
-    Tie(Vector2<f32>, Vector2<f32>, Color),
+    Point(Point, Color),
+    Arrow(Point, f32, Color),
+    Tie(Point, Point, Color),
 }
 
 /// 同步信息
