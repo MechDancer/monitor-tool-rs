@@ -1,22 +1,24 @@
-﻿use super::FigureItem;
-use iced::{canvas::Geometry, Color, Point, Rectangle, Size};
+﻿use super::{aabb::AABB, FigureItem};
+use iced::{canvas::Geometry, Color, Point, Size};
 use std::{
     collections::{vec_deque::Iter, HashMap, VecDeque},
     time::Instant,
 };
 
+mod cache;
+
+use cache::TopicCache;
+
 /// 话题内容，用于存储话题状态
 pub struct TopicContent {
-    sync_set: String,
+    pub sync_set: String, // 同步组
+    pub layer: String,    // 图层
 
+    capacity: usize,                    // 缓存容量
     queue: VecDeque<(Instant, Vertex)>, // 点数据
     color_map: HashMap<u8, Color>,      // 色彩映射
-}
 
-pub enum FocusMode {
-    All(Rectangle),
-    Last(Point),
-    Background,
+    cache: TopicCache,
 }
 
 /// 产生绘图对象的迭代器
@@ -28,7 +30,7 @@ pub struct Items<'a> {
 
 /// 迭代绘图缓存
 enum IterMemory {
-    Point(Point, f32, Color),
+    Vertex(Point, f32, Color),
     Position(Point),
 }
 
@@ -43,11 +45,11 @@ struct Vertex {
 impl TopicContent {
     pub fn draw(&mut self, bounds: Size) -> Geometry {
         let mut iter = self.queue.iter();
-        if let Some(items) = iter.next().map(|(_, p)| Items {
-            memory: IterMemory::Point(
-                p.pos,
-                p.dir,
-                self.color_map.get(&p.level).map_or(Color::BLACK, |c| *c),
+        if let Some(items) = iter.next().map(|(_, v)| Items {
+            memory: IterMemory::Vertex(
+                v.pos,
+                v.dir,
+                self.color_map.get(&v.level).map_or(Color::BLACK, |c| *c),
             ),
             iter,
             color_map: &self.color_map,
@@ -58,16 +60,33 @@ impl TopicContent {
         }
     }
 
-    /// 移除到最大存量，返回剩余点的最早时间
-    pub fn sync_by_size(&mut self, max_len: usize) -> Option<Instant> {
-        if self.queue.len() > max_len {
-            self.truncate(max_len);
+    /// 设置队列容量
+    pub fn set_capacity(&mut self, len: usize) {
+        if len != self.capacity {
+            self.capacity = len;
+            if self.queue.len() > len {
+                self.truncate(len);
+            }
         }
+    }
+
+    /// 设置关注长度
+    pub fn set_focus(&mut self, len: usize) {
+        self.cache.set_focus(len);
+    }
+
+    /// 获取时间范围
+    pub fn begin(&self) -> Option<Instant> {
         self.queue.back().map(|(t, _)| *t)
     }
 
-    /// 移除到最早时间
-    pub fn sync_by_time(&mut self, deadline: Instant) {
+    /// 计算关注范围
+    pub fn bound(&mut self) -> Option<AABB> {
+        self.cache.bound(self.queue.iter().map(|(_, v)| v.pos))
+    }
+
+    /// 依最时间范围同步
+    pub fn sync(&mut self, deadline: Instant) {
         let to_remove = self
             .queue
             .iter()
@@ -83,20 +102,9 @@ impl TopicContent {
     #[inline]
     fn truncate(&mut self, len: usize) {
         self.queue.truncate(len);
-        // clear
+        self.cache.clear();
     }
 }
-
-// impl Default for TopicContent {
-//     fn default() -> Self {
-//         Self {
-//             sync_set: Default::default(),
-//             queue: Default::default(),
-//             color_map: Default::default(),
-//             cache: Default::default(),
-//         }
-//     }
-// }
 
 impl Default for Vertex {
     fn default() -> Self {
@@ -114,7 +122,7 @@ impl<'a> Iterator for Items<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.memory {
-            IterMemory::Point(pos, dir, color) => {
+            IterMemory::Vertex(pos, dir, color) => {
                 self.memory = IterMemory::Position(pos);
                 if dir.is_nan() {
                     Some(FigureItem::Point(pos, color))
@@ -125,7 +133,7 @@ impl<'a> Iterator for Items<'a> {
             IterMemory::Position(p0) => self.iter.next().map(|(_, p)| {
                 let color = self.color_map.get(&p.level).map_or(Color::BLACK, |c| *c);
                 if p.tie {
-                    self.memory = IterMemory::Point(p.pos, p.dir, color);
+                    self.memory = IterMemory::Vertex(p.pos, p.dir, color);
                     FigureItem::Tie(p0, p.pos, color)
                 } else {
                     self.memory = IterMemory::Position(p.pos);
