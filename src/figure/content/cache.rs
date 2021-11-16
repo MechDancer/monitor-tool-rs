@@ -1,7 +1,7 @@
-﻿use super::{Config, FigureItem, Items, AABB};
+﻿use super::{FigureItem, Items, View, AABB};
 use iced::{
     canvas::{Cache, Geometry, Path, Stroke},
-    Point, Size, Vector,
+    Point, Vector,
 };
 
 #[derive(Default)]
@@ -9,7 +9,7 @@ pub(super) struct TopicCache {
     focus_len: usize,
     bound: Bound,
 
-    config: Config,
+    config: View,
     cache: Cache,
 }
 
@@ -24,23 +24,6 @@ impl Default for Bound {
     fn default() -> Self {
         Self::Invalid
     }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-impl Config {
-    const DEFAULT: Self = Self {
-        size: Size {
-            width: 640.0,
-            height: 480.0,
-        },
-        center: Point::ORIGIN,
-        scale: 1.0,
-    };
 }
 
 impl TopicCache {
@@ -72,7 +55,7 @@ impl TopicCache {
 
     /// 画图
     pub fn draw(&mut self, items: Items) -> Geometry {
-        let Config {
+        let View {
             size,
             center,
             scale,
@@ -134,7 +117,7 @@ impl TopicCache {
     }
 
     #[inline]
-    pub fn set_config(&mut self, config: Config) {
+    pub fn set_config(&mut self, config: View) {
         if self.config != config {
             self.config = config;
             self.redraw();

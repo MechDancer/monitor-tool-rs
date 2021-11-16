@@ -1,4 +1,4 @@
-﻿use super::{aabb::AABB, Config};
+﻿use super::{aabb::AABB, View};
 use iced::{canvas::Geometry, Color, Point};
 use std::{
     collections::{HashMap, VecDeque},
@@ -80,7 +80,7 @@ impl TopicContent {
 
     /// 设置变换
     #[inline]
-    pub fn set_config(&mut self, config: Config) {
+    pub fn set_config(&mut self, config: View) {
         self.cache.set_config(config);
     }
 
