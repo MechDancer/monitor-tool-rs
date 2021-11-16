@@ -91,15 +91,15 @@ impl TopicCache {
                         let p = Point { x, y: -y };
                         let (sin, cos) = d.sin_cos();
                         let d = Vector {
-                            x: cos * 10.0,
-                            y: sin * -10.0,
+                            x: cos * 15.0,
+                            y: sin * -15.0,
                         };
-                        frame.fill(&Path::circle(p, 1.0), color);
+                        frame.fill(&Path::circle(p, 2.0), color);
                         frame.stroke(
                             &Path::line(p, p + d),
                             Stroke {
                                 color,
-                                width: 1.0,
+                                width: 1.5,
                                 ..Default::default()
                             },
                         );
@@ -115,7 +115,7 @@ impl TopicCache {
                             &Path::line(p0, p1),
                             Stroke {
                                 color,
-                                width: 1.0,
+                                width: 1.5,
                                 ..Default::default()
                             },
                         );

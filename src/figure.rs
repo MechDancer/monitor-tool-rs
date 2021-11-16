@@ -1,8 +1,10 @@
 ﻿use iced::{canvas::Geometry, Point, Size};
 use std::{
     collections::{HashMap, HashSet},
+    f32::consts::FRAC_PI_2,
     fmt::Display,
-    net::IpAddr,
+    net::{SocketAddr, SocketAddrV4},
+    str::FromStr,
     time::{Duration, Instant},
 };
 
@@ -11,7 +13,7 @@ mod content;
 
 use content::TopicContent;
 
-use self::aabb::AABB;
+use self::{aabb::AABB, content::Vertex};
 
 /// 画面
 #[derive(Default)]
@@ -20,7 +22,7 @@ pub struct Figure {
     scale: Scale,  // 缩放尺度
 
     topics: HashMap<TopicTitle, TopicContent>,
-    layers: HashMap<String, (HashSet<TopicTitle>, bool)>,
+    visible_layers: HashSet<String>,
     sync_sets: HashMap<String, (HashSet<TopicTitle>, Duration)>,
 }
 
@@ -41,18 +43,52 @@ enum Scale {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct TopicTitle {
     title: String,
-    source: IpAddr,
+    source: SocketAddr,
 }
 
 impl Figure {
-    pub fn draw(&mut self, now: Instant, bounds: Size) -> Vec<Geometry> {
-        self.sync(now);
+    pub fn new() -> Self {
+        let mut default = Self::default();
+        let title = TopicTitle {
+            title: "test".into(),
+            source: SocketAddr::V4(SocketAddrV4::from_str("127.0.0.1:40000").unwrap()),
+        };
+        default.visible_layers.insert("test".into());
+        default
+            .topics
+            .insert(title.clone(), TopicContent::new("test", "test"));
+        default.topics.get_mut(&title).unwrap().push(
+            Instant::now(),
+            [
+                Vertex {
+                    pos: Point { x: 10.0, y: 10.0 },
+                    dir: 0.0,
+                    level: 0,
+                    tie: true,
+                },
+                Vertex {
+                    pos: Point { x: 30.0, y: -20.0 },
+                    dir: FRAC_PI_2,
+                    level: 0,
+                    tie: true,
+                },
+            ],
+        );
+        default
+    }
 
+    /// 画图
+    pub fn draw(&mut self, bounds: Size) -> Vec<Geometry> {
+        // 各组同步
+        self.sync(Instant::now());
+        // 创建配置
         let config = Config {
             size: bounds,
             center: self.center,
             scale: match self.scale {
+                // 固定尺度
                 Scale::Static(k) => k,
+                // 根据范围确定尺度
                 Scale::Automatic => self
                     .aabb()
                     .and_then(|aabb| {
@@ -63,8 +99,10 @@ impl Figure {
                     .unwrap_or(1.0),
             },
         };
+        // 写入配置并绘制
         self.topics
             .values_mut()
+            .filter(|content| self.visible_layers.contains(&content.layer))
             .filter_map(|content| {
                 content.set_config(config);
                 content.draw()
@@ -98,7 +136,7 @@ impl Figure {
     fn aabb(&mut self) -> Option<AABB> {
         self.topics
             .values_mut()
-            .filter(|content| self.layers[&content.layer].1)
+            .filter(|content| self.visible_layers.contains(&content.layer))
             .filter_map(|content| content.bound())
             .reduce(|sum, it| sum + it)
     }

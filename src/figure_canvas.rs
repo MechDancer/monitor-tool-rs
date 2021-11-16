@@ -22,7 +22,7 @@ impl FigureCanvas {
             border_mode,
             border_cache: Default::default(),
             time: Cell::new(Instant::now()),
-            figure: Default::default(),
+            figure: RefCell::new(Figure::new()),
         }
     }
 }
@@ -71,7 +71,7 @@ impl<Message> Program<Message> for FigureCanvas {
                 BorderMode::Polar(axis) => mark_polar(&mut frame, p, axis),
             };
         }
-        let mut topics = self.figure.borrow_mut().draw(now, bounds.size());
+        let mut topics = self.figure.borrow_mut().draw(bounds.size());
         topics.extend_from_slice(&[border, frame.into_geometry()]);
         let time = Instant::now();
         println!(" {:?}", time - now);
@@ -93,6 +93,10 @@ impl<Message> Program<Message> for FigureCanvas {
         }
         mouse::Interaction::default()
     }
+}
+
+impl BorderMode {
+    // fn available_size(&self, se)
 }
 
 fn line(frame: &mut Frame, x0: f32, y0: f32, x1: f32, y1: f32, color: Color) {

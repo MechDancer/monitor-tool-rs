@@ -1,5 +1,6 @@
-﻿use iced::{Point, Rectangle, Size};
+﻿use iced::{Point, Size};
 
+/// 用外边界表示的范围盒子
 #[derive(PartialEq, Clone, Copy)]
 pub struct AABB {
     min_x: f32,
@@ -69,4 +70,23 @@ impl std::ops::Add for AABB {
         });
         self
     }
+}
+
+#[test]
+fn test_size() {
+    const SIZE: Size = Size {
+        width: 640.0,
+        height: 480.0,
+    };
+    const AABB: AABB = AABB {
+        min_x: 0.0,
+        max_x: 0.0,
+        min_y: -0.0,
+        max_y: -0.0,
+    };
+    let Size { width, height } = AABB.size();
+    assert_eq!(0.0, width);
+    assert_eq!(0.0, height);
+    assert_eq!(SIZE.width / width, f32::INFINITY);
+    assert_eq!(SIZE.height / height, f32::INFINITY);
 }

@@ -25,10 +25,10 @@ pub(super) struct TopicContent {
 
 /// 图形顶点
 pub(super) struct Vertex {
-    pos: Point,
-    dir: f32,
-    level: u8,
-    tie: bool,
+    pub pos: Point,
+    pub dir: f32,
+    pub level: u8,
+    pub tie: bool,
 }
 
 /// 单个绘图对象
@@ -40,6 +40,19 @@ enum FigureItem {
 }
 
 impl TopicContent {
+    pub fn new(sync_set: impl ToString, layer: impl ToString) -> Self {
+        Self {
+            sync_set: sync_set.to_string(),
+            layer: layer.to_string(),
+
+            capacity: 10000,
+            queue: Default::default(),
+            color_map: Default::default(),
+
+            cache: Default::default(),
+        }
+    }
+
     /// 设置队列容量
     #[inline]
     pub fn set_capacity(&mut self, len: usize) {
@@ -89,8 +102,8 @@ impl TopicContent {
         Items::new(&self.queue, &mut self.color_map).map(|items| self.cache.draw(items))
     }
 
-    /// 向队列添加一点
-    pub fn push(&mut self, time: Instant, v: impl Iterator<Item = Vertex>) {
+    /// 向队列添加一组点
+    pub fn push(&mut self, time: Instant, v: impl IntoIterator<Item = Vertex>) {
         for v in v {
             if self.queue.len() >= self.capacity {
                 self.queue.pop_back();
