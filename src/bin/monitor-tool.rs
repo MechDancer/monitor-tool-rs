@@ -1,7 +1,6 @@
-﻿use async_std::{net::UdpSocket, sync::Arc, task};
-use iced::{executor, Application, Canvas, Command, Settings, Subscription};
-use monitor_tool::FigureProgram;
-use std::time::Duration;
+﻿use iced::{executor, Application, Canvas, Command, Settings, Subscription};
+use monitor_tool::{FigureProgram, Server};
+use std::{net::SocketAddr, time::Instant};
 
 fn main() -> iced::Result {
     Main::run(Settings {
@@ -22,49 +21,41 @@ struct Flags {
 
 struct Main {
     title: String,
-    socket: Arc<UdpSocket>,
+    port: u16,
     canvas: FigureProgram,
 }
 
 impl Application for Main {
     type Executor = executor::Default;
-    type Message = ();
+    type Message = (Instant, SocketAddr, Vec<u8>);
     type Flags = Flags;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        task::block_on(async {
-            (
-                Main {
-                    title: flags.title,
-                    socket: Arc::new(
-                        UdpSocket::bind(format!("0.0.0.0:{}", flags.port))
-                            .await
-                            .unwrap(),
-                    ),
-                    canvas: FigureProgram::new(),
-                },
-                Command::none(),
-            )
-        })
-    }
-
-    fn title(&self) -> String {
-        format!(
-            "{}: {}",
-            self.title,
-            self.socket.local_addr().unwrap().port()
+        (
+            Main {
+                title: flags.title,
+                port: flags.port,
+                // server: ,
+                canvas: FigureProgram::new(),
+            },
+            Command::none(),
         )
     }
 
+    fn title(&self) -> String {
+        format!("{}: {}", self.title, self.port)
+    }
+
     fn subscription(&self) -> Subscription<Self::Message> {
-        iced::time::every(Duration::from_millis(30)).map(|_| ())
+        Subscription::from_recipe(Server::new(self.port))
     }
 
     fn update(
         &mut self,
-        _message: Self::Message,
+        message: Self::Message,
         _clipboard: &mut iced::Clipboard,
     ) -> Command<Self::Message> {
+        println!("Received! len = {}", message.2.len());
         Command::none()
     }
 

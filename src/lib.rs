@@ -1,12 +1,15 @@
 ﻿use async_std::{
+    net::{SocketAddr, UdpSocket},
     sync::{Arc, Mutex},
     task,
 };
 use iced::{
     canvas::{Cache, Cursor, Geometry, Program},
+    futures::stream::{repeat_with, BoxStream},
     mouse::Interaction,
     Color, Rectangle, Size,
 };
+use iced_futures::subscription::Recipe;
 use std::time::Instant;
 
 mod figure;
@@ -17,6 +20,14 @@ use figure_canvas::*;
 
 #[derive(Clone)]
 pub struct FigureProgram(Arc<Mutex<FigureCanvas>>);
+
+pub struct Server(u16);
+
+struct FigureCanvas {
+    update_time: Instant,
+    border_cache: Cache,
+    figure: Figure,
+}
 
 impl FigureProgram {
     #[inline]
@@ -30,7 +41,7 @@ impl FigureProgram {
 
     #[inline]
     pub async fn receive(&self, buf: &[u8]) {
-        self.0.lock().await.receive(buf);
+        self.0.lock().await.figure.receive(buf);
     }
 }
 
@@ -56,12 +67,6 @@ impl<Message> Program<Message> for FigureProgram {
     }
 }
 
-struct FigureCanvas {
-    update_time: Instant,
-    border_cache: Cache,
-    figure: Figure,
-}
-
 impl FigureCanvas {
     fn draw(&mut self, size: Size) -> (Rectangle, Vec<Geometry>) {
         let now = Instant::now();
@@ -81,6 +86,53 @@ impl FigureCanvas {
         }
         result
     }
+}
 
-    fn receive(&mut self, buf: &[u8]) {}
+impl Server {
+    pub fn new(port: u16) -> Self {
+        // Self(Arc::new(
+        //     task::block_on(UdpSocket::bind(format!("0.0.0.0:{}", port))).unwrap(),
+        // ))
+        Self(port)
+    }
+}
+
+impl<H, E> Recipe<H, E> for Server
+where
+    H: std::hash::Hasher,
+{
+    type Output = (std::time::Instant, SocketAddr, Vec<u8>);
+
+    fn hash(&self, state: &mut H) {
+        use std::hash::Hash;
+        std::any::TypeId::of::<Self>().hash(state);
+        self.0.hash(state);
+    }
+
+    fn stream(self: Box<Self>, _input: BoxStream<'static, E>) -> BoxStream<'static, Self::Output> {
+        let socket =
+            Arc::new(task::block_on(UdpSocket::bind(format!("0.0.0.0:{}", self.0))).unwrap());
+        let mut buf = [0u8; 1500];
+        Box::pin(repeat_with(move || {
+            let socket = socket.clone();
+            task::block_on(async move {
+                let (len, add) = socket.recv_from(&mut buf).await.unwrap();
+                (Instant::now(), add, buf[..len].to_vec())
+            })
+        }))
+    }
+}
+
+#[test]
+fn send() {
+    use std::net::{Ipv4Addr, SocketAddrV4};
+    task::block_on(async {
+        let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
+        let _ = socket
+            .send_to(
+                &[1, 2, 3, 4, 5, 6, 7, 8, 9],
+                SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 12345)),
+            )
+            .await;
+    });
 }

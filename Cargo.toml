@@ -7,6 +7,5 @@ readme = "README.md"
 
 [dependencies]
 iced = { version = "*", features = ["glow", "glow_canvas", "async-std"] }
-iced_graphics = "*"
-features = "*"
+iced_futures = "*"
 async-std = "*"

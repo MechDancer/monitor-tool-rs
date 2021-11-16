@@ -39,6 +39,9 @@ pub struct TopicTitle {
 }
 
 impl Figure {
+    /// 接收指令
+    pub fn receive(&mut self, buf: &[u8]) {}
+
     /// 画图
     pub fn draw(&mut self, bounds: Size, available_bounds: Size) -> (Rectangle, Vec<Geometry>) {
         // 各组同步
