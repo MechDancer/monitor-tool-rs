@@ -71,7 +71,10 @@ impl<Message> Program<Message> for FigureCanvas {
                 BorderMode::Polar(axis) => mark_polar(&mut frame, p, axis),
             };
         }
-        let mut topics = self.figure.borrow_mut().draw(bounds.size());
+        let mut topics = self.figure.borrow_mut().draw(
+            bounds.size(),
+            self.border_mode.available_size(bounds.size()),
+        );
         topics.extend_from_slice(&[border, frame.into_geometry()]);
         let time = Instant::now();
         println!(" {:?}", time - now);
@@ -96,7 +99,16 @@ impl<Message> Program<Message> for FigureCanvas {
 }
 
 impl BorderMode {
-    // fn available_size(&self, se)
+    fn available_size(&self, size: Size) -> Size {
+        let Size { width, height } = size;
+        match self {
+            BorderMode::Rectangular => Size {
+                width: width - (BORDER_OFFSET.x + 20.0) * 2.0,
+                height: height - (BORDER_OFFSET.y + 20.0) * 2.0,
+            },
+            BorderMode::Polar(_) => todo!(),
+        }
+    }
 }
 
 fn line(frame: &mut Frame, x0: f32, y0: f32, x1: f32, y1: f32, color: Color) {
@@ -122,13 +134,10 @@ fn text(frame: &mut Frame, num: f32, x: f32, y: f32, size: f32) {
 }
 
 fn radius(size: Size) -> f32 {
-    let a = size.width / 2.0 - BORDER_OFFSET.x;
-    let b = size.height / 2.0 - BORDER_OFFSET.y;
-    if a < b {
-        a
-    } else {
-        b
-    }
+    f32::min(
+        size.width / 2.0 - BORDER_OFFSET.x,
+        size.height / 2.0 - BORDER_OFFSET.y,
+    )
 }
 
 fn in_bounds_rectangle(size: Size, p: Point) -> bool {

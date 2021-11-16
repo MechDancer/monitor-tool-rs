@@ -18,8 +18,7 @@ use self::{aabb::AABB, content::Vertex};
 /// 画面
 #[derive(Default)]
 pub struct Figure {
-    center: Point, // 画面中心坐标
-    scale: Scale,  // 缩放尺度
+    camera: Camera, // 视角
 
     topics: HashMap<TopicTitle, TopicContent>,
     visible_layers: HashSet<String>,
@@ -33,14 +32,15 @@ struct Config {
     scale: f32,
 }
 
-/// 缩放尺度
-enum Scale {
-    Static(f32),
-    Automatic,
+/// 变换
+#[derive(Debug)]
+enum Camera {
+    Static(Point, f32),
+    Automatic(Point, f32),
 }
 
 /// 话题标题，用于区分话题
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct TopicTitle {
     title: String,
     source: SocketAddr,
@@ -53,51 +53,63 @@ impl Figure {
             title: "test".into(),
             source: SocketAddr::V4(SocketAddrV4::from_str("127.0.0.1:40000").unwrap()),
         };
+        default.camera = Camera::Automatic(Point::ORIGIN, 1.0);
         default.visible_layers.insert("test".into());
         default
             .topics
             .insert(title.clone(), TopicContent::new("test", "test"));
-        default.topics.get_mut(&title).unwrap().push(
+        let topic = default.topics.get_mut(&title).unwrap();
+        topic.push(
             Instant::now(),
             [
                 Vertex {
-                    pos: Point { x: 10.0, y: 10.0 },
+                    pos: Point { x: 0.0, y: 0.0 },
                     dir: 0.0,
                     level: 0,
                     tie: true,
                 },
                 Vertex {
-                    pos: Point { x: 30.0, y: -20.0 },
+                    pos: Point { x: 10.0, y: 10.0 },
                     dir: FRAC_PI_2,
                     level: 0,
                     tie: true,
                 },
             ],
         );
+        topic.set_focus(100);
         default
     }
 
     /// 画图
-    pub fn draw(&mut self, bounds: Size) -> Vec<Geometry> {
+    pub fn draw(&mut self, bounds: Size, available_bounds: Size) -> Vec<Geometry> {
         // 各组同步
         self.sync(Instant::now());
         // 创建配置
-        let config = Config {
-            size: bounds,
-            center: self.center,
-            scale: match self.scale {
-                // 固定尺度
-                Scale::Static(k) => k,
-                // 根据范围确定尺度
-                Scale::Automatic => self
-                    .aabb()
-                    .and_then(|aabb| {
-                        let Size { width, height } = aabb.size();
-                        Some(f32::min(bounds.width / width, bounds.height / height))
-                            .filter(|k| k.is_finite())
-                    })
-                    .unwrap_or(1.0),
+        let config = match self.camera {
+            Camera::Static(center, scale) => Config {
+                size: bounds,
+                center,
+                scale,
             },
+            Camera::Automatic(mut center, mut scale) => {
+                if let Some(aabb) = self.aabb() {
+                    center = aabb.center();
+                    let Size { width, height } = aabb.size();
+                    let new = f32::min(
+                        available_bounds.width / width,
+                        available_bounds.height / height,
+                    );
+                    if new.is_finite() {
+                        scale = new;
+                    }
+                }
+                self.camera = Camera::Automatic(center, scale);
+                Config {
+                    size: bounds,
+                    center,
+                    scale,
+                }
+            }
         };
         // 写入配置并绘制
         self.topics
@@ -137,14 +149,14 @@ impl Figure {
         self.topics
             .values_mut()
             .filter(|content| self.visible_layers.contains(&content.layer))
-            .filter_map(|content| content.bound())
+            .filter_map(|content| content.aabb())
             .reduce(|sum, it| sum + it)
     }
 }
 
-impl Default for Scale {
+impl Default for Camera {
     fn default() -> Self {
-        Self::Static(1.0)
+        Self::Static(Point::ORIGIN, 1.0)
     }
 }
 

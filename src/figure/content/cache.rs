@@ -45,7 +45,7 @@ impl Config {
 
 impl TopicCache {
     /// 计算范围
-    pub fn bound(&mut self, iter: impl Iterator<Item = Point>) -> Option<AABB> {
+    pub fn aabb(&mut self, iter: impl Iterator<Item = Point>) -> Option<AABB> {
         match self.bound {
             Bound::Cached(aabb) => Some(aabb),
             Bound::CachedVoid => None,

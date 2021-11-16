@@ -32,10 +32,24 @@ impl AABB {
     }
 
     /// 计算 [`Size`]
+    #[inline]
     pub fn size(&self) -> Size {
         Size {
             width: self.max_x - self.min_x,
             height: self.max_y - self.min_y,
+        }
+    }
+
+    #[inline]
+    pub fn is_point(&self) -> bool {
+        self.min_x == self.max_x && self.min_y == self.max_y
+    }
+
+    #[inline]
+    pub fn center(&self) -> Point {
+        Point {
+            x: (self.min_x + self.max_x) / 2.0,
+            y: (self.min_y + self.max_y) / 2.0,
         }
     }
 
