@@ -11,9 +11,8 @@ use std::{
 mod aabb;
 mod content;
 
-use content::TopicContent;
-
-use self::{aabb::AABB, content::Vertex};
+use aabb::AABB;
+use content::{TopicContent, Vertex};
 
 /// 画面
 #[derive(Default)]
