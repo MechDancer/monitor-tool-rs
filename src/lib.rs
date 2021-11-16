@@ -16,8 +16,6 @@ use figure_canvas::*;
 
 pub struct FigureCanvas {
     border_cache: Cache,
-
-    time: Cell<Instant>,
     figure: RefCell<Figure>,
 }
 
@@ -25,7 +23,6 @@ impl FigureCanvas {
     pub fn new() -> Self {
         Self {
             border_cache: Default::default(),
-            time: Cell::new(Instant::now()),
             figure: RefCell::new(Figure::new()),
         }
     }
@@ -49,11 +46,13 @@ impl<Message> Program<Message> for FigureCanvas {
             }
         }
         // 计时
-        {
-            let period = now - self.time.get();
-            let delay = Instant::now() - now;
-            println!("period = {:?}, delay = {:?}", period, delay);
-            self.time.set(now);
+        unsafe {
+            static mut TIME: Option<Instant> = None;
+            if let Some(last) = std::mem::replace(&mut TIME, Some(now)) {
+                let period = now - last;
+                let delay = Instant::now() - now;
+                println!("period = {:?}, delay = {:?}", period, delay);
+            }
         }
         geometries
     }

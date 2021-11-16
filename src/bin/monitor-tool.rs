@@ -1,6 +1,7 @@
 ﻿use async_std::{net::UdpSocket, sync::Arc, task};
 use iced::{executor, Application, Canvas, Command, Settings, Subscription};
 use monitor_tool::FigureCanvas;
+use std::time::Duration;
 
 fn main() -> iced::Result {
     Main::run(Settings {
@@ -31,15 +32,14 @@ impl Application for Main {
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
         task::block_on(async {
-            let socket = Arc::new(
-                UdpSocket::bind(format!("0.0.0.0:{}", flags.port))
-                    .await
-                    .unwrap(),
-            );
             (
                 Main {
                     title: flags.title,
-                    socket,
+                    socket: Arc::new(
+                        UdpSocket::bind(format!("0.0.0.0:{}", flags.port))
+                            .await
+                            .unwrap(),
+                    ),
                 },
                 Command::none(),
             )
@@ -55,7 +55,7 @@ impl Application for Main {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        Subscription::none()
+        iced::time::every(Duration::from_millis(30)).map(|_| ())
     }
 
     fn update(
@@ -63,13 +63,11 @@ impl Application for Main {
         _message: Self::Message,
         _clipboard: &mut iced::Clipboard,
     ) -> Command<Self::Message> {
-        println!("update!");
         Command::none()
     }
 
     fn view(&mut self) -> iced::Element<'_, Self::Message> {
         use iced::Length::Fill;
-        println!("new view!");
         Canvas::new(FigureCanvas::new())
             .width(Fill)
             .height(Fill)
