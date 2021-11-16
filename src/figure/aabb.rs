@@ -30,15 +30,12 @@ impl AABB {
         })
     }
 
-    /// 转 [`Rectangle`]
-    pub fn to_rectangle(&self) -> Rectangle {
-        Rectangle::new(
-            Point {
-                x: self.min_x,
-                y: self.min_y,
-            },
-            Size::new(self.max_x - self.min_x, self.max_y - self.min_y),
-        )
+    /// 计算 [`Size`]
+    pub fn size(&self) -> Size {
+        Size {
+            width: self.max_x - self.min_x,
+            height: self.max_y - self.min_y,
+        }
     }
 
     /// 吸收一个点，可能扩大盒范围

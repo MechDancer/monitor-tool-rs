@@ -1,5 +1,5 @@
-﻿pub mod canvas2d;
-mod figure;
+﻿mod figure;
+pub mod figure_canvas;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BorderMode {

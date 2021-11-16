@@ -1,4 +1,4 @@
-﻿use iced::{canvas::Geometry, Color, Point, Rectangle, Size};
+﻿use iced::{canvas::Geometry, Point, Size};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -9,13 +9,32 @@ use std::{
 mod aabb;
 mod content;
 
-pub use content::TopicContent;
+use content::TopicContent;
+
+use self::aabb::AABB;
 
 /// 画面
+#[derive(Default)]
 pub struct Figure {
+    center: Point, // 画面中心坐标
+    scale: Scale,  // 缩放尺度
+
     topics: HashMap<TopicTitle, TopicContent>,
     layers: HashMap<String, (HashSet<TopicTitle>, bool)>,
     sync_sets: HashMap<String, (HashSet<TopicTitle>, Duration)>,
+}
+
+#[derive(PartialEq, Clone, Copy)]
+struct Config {
+    size: Size,
+    center: Point,
+    scale: f32,
+}
+
+/// 缩放尺度
+enum Scale {
+    Static(f32),
+    Automatic,
 }
 
 /// 话题标题，用于区分话题
@@ -25,16 +44,32 @@ pub struct TopicTitle {
     source: IpAddr,
 }
 
-impl Display for TopicTitle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", self.title, self.source)
-    }
-}
-
 impl Figure {
-    pub fn draw(&mut self, now: Instant, bound: Size) -> Vec<Geometry> {
+    pub fn draw(&mut self, now: Instant, bounds: Size) -> Vec<Geometry> {
         self.sync(now);
-        todo!()
+
+        let config = Config {
+            size: bounds,
+            center: self.center,
+            scale: match self.scale {
+                Scale::Static(k) => k,
+                Scale::Automatic => self
+                    .aabb()
+                    .and_then(|aabb| {
+                        let Size { width, height } = aabb.size();
+                        Some(f32::min(bounds.width / width, bounds.height / height))
+                            .filter(|k| k.is_finite())
+                    })
+                    .unwrap_or(1.0),
+            },
+        };
+        self.topics
+            .values_mut()
+            .filter_map(|content| {
+                content.set_config(config);
+                content.draw()
+            })
+            .collect()
     }
 
     /// 同步
@@ -60,12 +95,23 @@ impl Figure {
     }
 
     /// 计算范围
-    fn bound(&mut self) -> Option<Rectangle> {
+    fn aabb(&mut self) -> Option<AABB> {
         self.topics
             .values_mut()
             .filter(|content| self.layers[&content.layer].1)
             .filter_map(|content| content.bound())
             .reduce(|sum, it| sum + it)
-            .map(|aabb| aabb.to_rectangle())
+    }
+}
+
+impl Default for Scale {
+    fn default() -> Self {
+        Self::Static(1.0)
+    }
+}
+
+impl Display for TopicTitle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({})", self.title, self.source)
     }
 }

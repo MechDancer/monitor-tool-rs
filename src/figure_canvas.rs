@@ -1,26 +1,37 @@
 ﻿use super::{BorderMode, PolarAxis};
+use crate::figure::Figure;
 use iced::{canvas::*, mouse, Color, Point, Rectangle, Size, Vector};
+use std::{
+    cell::{Cell, RefCell},
+    time::Instant,
+};
 
 const BORDER_OFFSET: Point = Point { x: 64.0, y: 32.0 };
 
-pub struct Figure {
+pub struct FigureCanvas {
     border_mode: BorderMode,
-
     border_cache: Cache,
+
+    time: Cell<Instant>,
+    figure: RefCell<Figure>,
 }
 
-impl Figure {
+impl FigureCanvas {
     pub fn new(border_mode: BorderMode) -> Self {
-        Figure {
+        Self {
             border_mode,
-
             border_cache: Default::default(),
+            time: Cell::new(Instant::now()),
+            figure: Default::default(),
         }
     }
 }
 
-impl<Message> Program<Message> for Figure {
+impl<Message> Program<Message> for FigureCanvas {
     fn draw(&self, bounds: iced::Rectangle, cursor: Cursor) -> Vec<Geometry> {
+        let now = Instant::now();
+        print!("{:?}", now - self.time.get());
+        self.time.set(now);
         let border = self.border_cache.draw(bounds.size(), |frame| {
             let Size {
                 width: w,
@@ -60,7 +71,11 @@ impl<Message> Program<Message> for Figure {
                 BorderMode::Polar(axis) => mark_polar(&mut frame, p, axis),
             };
         }
-        vec![border, frame.into_geometry()]
+        let mut topics = self.figure.borrow_mut().draw(now, bounds.size());
+        topics.extend_from_slice(&[border, frame.into_geometry()]);
+        let time = Instant::now();
+        println!(" {:?}", time - now);
+        topics
     }
 
     fn mouse_interaction(&self, bounds: Rectangle, cursor: Cursor) -> mouse::Interaction {

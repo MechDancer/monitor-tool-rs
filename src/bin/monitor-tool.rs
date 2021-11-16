@@ -1,6 +1,6 @@
 ﻿use async_std::{net::UdpSocket, sync::Arc, task};
 use iced::{executor, Application, Canvas, Command, Settings, Subscription};
-use monitor_tool::canvas2d::*;
+use monitor_tool::figure_canvas::*;
 use monitor_tool::{BorderMode, PolarAxis};
 
 fn main() -> iced::Result {
@@ -71,7 +71,7 @@ impl Application for Main {
     fn view(&mut self) -> iced::Element<'_, Self::Message> {
         use iced::Length::Fill;
         println!("new view!");
-        Canvas::new(Figure::new(BorderMode::Polar(PolarAxis::Top)))
+        Canvas::new(FigureCanvas::new(BorderMode::Rectangular))
             .width(Fill)
             .height(Fill)
             .into()

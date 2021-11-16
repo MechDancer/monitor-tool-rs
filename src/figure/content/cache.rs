@@ -1,4 +1,4 @@
-﻿use super::{FigureItem, Items, AABB};
+﻿use super::{Config, FigureItem, Items, AABB};
 use iced::{
     canvas::{Cache, Geometry, Path, Stroke},
     Point, Size, Vector,
@@ -11,13 +11,6 @@ pub(super) struct TopicCache {
 
     config: Config,
     cache: Cache,
-}
-
-#[derive(PartialEq)]
-pub(super) struct Config {
-    size: Size,
-    translation: Vector,
-    scale: f32,
 }
 
 enum Bound {
@@ -45,7 +38,7 @@ impl Config {
             width: 640.0,
             height: 480.0,
         },
-        translation: Vector { x: 0.0, y: 0.0 },
+        center: Point::ORIGIN,
         scale: 1.0,
     };
 }
@@ -81,25 +74,25 @@ impl TopicCache {
     pub fn draw(&mut self, items: Items) -> Geometry {
         let Config {
             size,
-            translation,
+            center,
             scale,
         } = self.config;
         let items = items.collect::<Vec<_>>();
         self.cache.draw(size, |frame| {
-            frame.translate(translation);
-            frame.scale(scale);
-
-            use FigureItem::*;
+            frame.translate(frame.center() - Point::ORIGIN);
             for item in items.iter().copied() {
                 match item {
-                    Point(p, color) => {
-                        frame.fill(&Path::circle(p, 1.0), color);
+                    FigureItem::Point(p, color) => {
+                        let Vector { x, y } = (p - center) * scale;
+                        frame.fill(&Path::circle(Point { x, y: -y }, 1.0), color);
                     }
-                    Arrow(p, d, color) => {
+                    FigureItem::Arrow(p, d, color) => {
+                        let Vector { x, y } = (p - center) * scale;
+                        let p = Point { x, y: -y };
                         let (sin, cos) = d.sin_cos();
                         let d = Vector {
                             x: cos * 10.0,
-                            y: sin * 10.0,
+                            y: sin * -10.0,
                         };
                         frame.fill(&Path::circle(p, 1.0), color);
                         frame.stroke(
@@ -111,7 +104,13 @@ impl TopicCache {
                             },
                         );
                     }
-                    Tie(p0, p1, color) => {
+                    FigureItem::Tie(p0, p1, color) => {
+                        let Vector { x, y } = (p0 - center) * scale;
+                        let p0 = Point { x, y: -y };
+
+                        let Vector { x, y } = (p1 - center) * scale;
+                        let p1 = Point { x, y: -y };
+
                         frame.stroke(
                             &Path::line(p0, p1),
                             Stroke {
