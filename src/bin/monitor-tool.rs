@@ -1,6 +1,6 @@
 ﻿use async_std::{net::UdpSocket, sync::Arc, task};
 use iced::{executor, Application, Canvas, Command, Settings, Subscription};
-use monitor_tool::FigureCanvas;
+use monitor_tool::FigureProgram;
 use std::time::Duration;
 
 fn main() -> iced::Result {
@@ -23,6 +23,7 @@ struct Flags {
 struct Main {
     title: String,
     socket: Arc<UdpSocket>,
+    canvas: FigureProgram,
 }
 
 impl Application for Main {
@@ -40,6 +41,7 @@ impl Application for Main {
                             .await
                             .unwrap(),
                     ),
+                    canvas: FigureProgram::new(),
                 },
                 Command::none(),
             )
@@ -68,7 +70,7 @@ impl Application for Main {
 
     fn view(&mut self) -> iced::Element<'_, Self::Message> {
         use iced::Length::Fill;
-        Canvas::new(FigureCanvas::new())
+        Canvas::new(self.canvas.clone())
             .width(Fill)
             .height(Fill)
             .into()
