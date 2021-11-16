@@ -1,4 +1,4 @@
-﻿use iced::{canvas::Geometry, Point, Size};
+﻿use iced::{canvas::Geometry, Color, Point, Rectangle, Size, Vector};
 use std::{
     collections::{HashMap, HashSet},
     f32::consts::FRAC_PI_2,
@@ -34,9 +34,10 @@ struct Config {
 
 /// 变换
 #[derive(Debug)]
-enum Camera {
-    Static(Point, f32),
-    Automatic(Point, f32),
+struct Camera {
+    automatic: bool,
+    center: Point,
+    scale: f32,
 }
 
 /// 话题标题，用于区分话题
@@ -53,12 +54,21 @@ impl Figure {
             title: "test".into(),
             source: SocketAddr::V4(SocketAddrV4::from_str("127.0.0.1:40000").unwrap()),
         };
-        default.camera = Camera::Automatic(Point::ORIGIN, 1.0);
+        default.camera.automatic = true;
         default.visible_layers.insert("test".into());
         default
             .topics
             .insert(title.clone(), TopicContent::new("test", "test"));
         let topic = default.topics.get_mut(&title).unwrap();
+        topic.set_color(
+            0,
+            Color {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            },
+        );
         topic.push(
             Instant::now(),
             [
@@ -71,7 +81,7 @@ impl Figure {
                 Vertex {
                     pos: Point { x: 10.0, y: 10.0 },
                     dir: FRAC_PI_2,
-                    level: 0,
+                    level: 2,
                     tie: true,
                 },
             ],
@@ -81,45 +91,54 @@ impl Figure {
     }
 
     /// 画图
-    pub fn draw(&mut self, bounds: Size, available_bounds: Size) -> Vec<Geometry> {
+    pub fn draw(&mut self, bounds: Size, available_bounds: Size) -> (Rectangle, Vec<Geometry>) {
         // 各组同步
         self.sync(Instant::now());
-        // 创建配置
-        let config = match self.camera {
-            Camera::Static(center, scale) => Config {
-                size: bounds,
-                center,
-                scale,
-            },
-            Camera::Automatic(mut center, mut scale) => {
-                if let Some(aabb) = self.aabb() {
-                    center = aabb.center();
-                    let Size { width, height } = aabb.size();
-                    let new = f32::min(
-                        available_bounds.width / width,
-                        available_bounds.height / height,
-                    );
-                    if new.is_finite() {
-                        scale = new;
-                    }
-                }
-                self.camera = Camera::Automatic(center, scale);
-                Config {
-                    size: bounds,
-                    center,
-                    scale,
+        // 计算自动范围
+        if self.camera.automatic {
+            if let Some(aabb) = self.aabb() {
+                self.camera.center = aabb.center();
+
+                let Size { width, height } = aabb.size();
+                let new = f32::min(
+                    available_bounds.width / width,
+                    available_bounds.height / height,
+                );
+                if new.is_finite() {
+                    self.camera.scale = new;
                 }
             }
+        }
+        // 创建配置
+        let config = Config {
+            size: bounds,
+            center: self.camera.center,
+            scale: self.camera.scale,
+        };
+        // 计算对角线
+        let diagonal = Vector {
+            x: bounds.width / config.scale,
+            y: bounds.height / config.scale,
         };
         // 写入配置并绘制
-        self.topics
+        let geometries = self
+            .topics
             .values_mut()
             .filter(|content| self.visible_layers.contains(&content.layer))
             .filter_map(|content| {
                 content.set_config(config);
                 content.draw()
             })
-            .collect()
+            .collect();
+        (
+            Rectangle {
+                x: config.center.x - diagonal.x * 0.5,
+                y: config.center.y + diagonal.y * 0.5,
+                width: diagonal.x,
+                height: diagonal.y,
+            },
+            geometries,
+        )
     }
 
     /// 同步
@@ -156,8 +175,16 @@ impl Figure {
 
 impl Default for Camera {
     fn default() -> Self {
-        Self::Static(Point::ORIGIN, 1.0)
+        Self::STATIC_ORIGIN
     }
+}
+
+impl Camera {
+    const STATIC_ORIGIN: Self = Self {
+        automatic: false,
+        center: Point::ORIGIN,
+        scale: 1.0,
+    };
 }
 
 impl Display for TopicTitle {

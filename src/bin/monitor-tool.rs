@@ -1,7 +1,6 @@
 ﻿use async_std::{net::UdpSocket, sync::Arc, task};
 use iced::{executor, Application, Canvas, Command, Settings, Subscription};
 use monitor_tool::figure_canvas::*;
-use monitor_tool::BorderMode;
 
 fn main() -> iced::Result {
     Main::run(Settings {
@@ -71,7 +70,7 @@ impl Application for Main {
     fn view(&mut self) -> iced::Element<'_, Self::Message> {
         use iced::Length::Fill;
         println!("new view!");
-        Canvas::new(FigureCanvas::new(BorderMode::Rectangular))
+        Canvas::new(FigureCanvas::new())
             .width(Fill)
             .height(Fill)
             .into()

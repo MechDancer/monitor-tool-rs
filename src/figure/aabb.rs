@@ -41,11 +41,6 @@ impl AABB {
     }
 
     #[inline]
-    pub fn is_point(&self) -> bool {
-        self.min_x == self.max_x && self.min_y == self.max_y
-    }
-
-    #[inline]
     pub fn center(&self) -> Point {
         Point {
             x: (self.min_x + self.max_x) / 2.0,
