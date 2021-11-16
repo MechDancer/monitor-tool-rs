@@ -40,6 +40,7 @@ impl AABB {
         }
     }
 
+    /// 计算中心点
     #[inline]
     pub fn center(&self) -> Point {
         Point {

@@ -4,10 +4,9 @@
     task,
 };
 use iced::{
-    canvas::{Cache, Cursor, Geometry, Program},
+    canvas::{event, Cache, Cursor, Event, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    mouse::Interaction,
-    Color, Rectangle, Size,
+    mouse, Color, Rectangle, Size,
 };
 use iced_futures::subscription::Recipe;
 use std::time::Instant;
@@ -22,6 +21,12 @@ use figure_canvas::*;
 pub struct FigureProgram(Arc<Mutex<FigureCanvas>>);
 
 pub struct Server(u16);
+
+#[derive(Debug)]
+pub enum Message {
+    MessageReceived(Instant, SocketAddr, Vec<u8>),
+    ViewUpdated,
+}
 
 struct FigureCanvas {
     update_time: Instant,
@@ -45,10 +50,38 @@ impl FigureProgram {
     }
 }
 
-impl<Message> Program<Message> for FigureProgram {
-    fn draw(&self, bounds: iced::Rectangle, cursor: Cursor) -> Vec<Geometry> {
+impl Program<Message> for FigureProgram {
+    fn update(
+        &mut self,
+        event: Event,
+        bounds: Rectangle,
+        cursor: Cursor,
+    ) -> (event::Status, Option<Message>) {
+        let pos = if let Some(position) = cursor.position_in(&bounds) {
+            position
+        } else {
+            return (event::Status::Ignored, None);
+        };
+        let bounds = bounds.size();
+
+        use mouse::{Event::*, ScrollDelta};
+        match event {
+            event::Event::Mouse(mouse_event) => {
+                match mouse_event {
+                    WheelScrolled {
+                        delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
+                    } => task::block_on(self.0.lock()).figure.zoom(y, pos, bounds),
+                    _ => {}
+                }
+                (event::Status::Captured, Some(Message::ViewUpdated))
+            }
+            _ => (event::Status::Ignored, None),
+        }
+    }
+
+    fn draw(&self, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry> {
         let size = bounds.size();
-        let (rectangle, mut geometries) = task::block_on(async { self.0.lock().await.draw(size) });
+        let (rectangle, mut geometries) = task::block_on(self.0.lock()).draw(size);
         if let Cursor::Available(p) = cursor {
             if is_available(size, p) {
                 geometries.push(mark_cross(size, p, rectangle));
@@ -57,13 +90,13 @@ impl<Message> Program<Message> for FigureProgram {
         geometries
     }
 
-    fn mouse_interaction(&self, bounds: Rectangle, cursor: Cursor) -> Interaction {
+    fn mouse_interaction(&self, bounds: Rectangle, cursor: Cursor) -> mouse::Interaction {
         if let Cursor::Available(p) = cursor {
             if is_available(bounds.size(), p) {
-                return Interaction::Crosshair;
+                return mouse::Interaction::Crosshair;
             }
         }
-        Interaction::default()
+        mouse::Interaction::default()
     }
 }
 
@@ -89,10 +122,7 @@ impl FigureCanvas {
 }
 
 impl Server {
-    pub fn new(port: u16) -> Self {
-        // Self(Arc::new(
-        //     task::block_on(UdpSocket::bind(format!("0.0.0.0:{}", port))).unwrap(),
-        // ))
+    pub const fn new(port: u16) -> Self {
         Self(port)
     }
 }
@@ -101,7 +131,7 @@ impl<H, E> Recipe<H, E> for Server
 where
     H: std::hash::Hasher,
 {
-    type Output = (std::time::Instant, SocketAddr, Vec<u8>);
+    type Output = Message;
 
     fn hash(&self, state: &mut H) {
         use std::hash::Hash;
@@ -115,10 +145,8 @@ where
         let mut buf = [0u8; 1500];
         Box::pin(repeat_with(move || {
             let socket = socket.clone();
-            task::block_on(async move {
-                let (len, add) = socket.recv_from(&mut buf).await.unwrap();
-                (Instant::now(), add, buf[..len].to_vec())
-            })
+            let (len, add) = task::block_on(socket.recv_from(&mut buf)).unwrap();
+            Message::MessageReceived(Instant::now(), add, buf[..len].to_vec())
         }))
     }
 }

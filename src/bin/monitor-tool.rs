@@ -1,5 +1,5 @@
 ﻿use iced::{executor, Application, Canvas, Command, Settings, Subscription};
-use monitor_tool::{FigureProgram, Server};
+use monitor_tool::{FigureProgram, Message, Server};
 use std::{net::SocketAddr, time::Instant};
 
 fn main() -> iced::Result {
@@ -27,7 +27,7 @@ struct Main {
 
 impl Application for Main {
     type Executor = executor::Default;
-    type Message = (Instant, SocketAddr, Vec<u8>);
+    type Message = Message;
     type Flags = Flags;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
@@ -35,7 +35,6 @@ impl Application for Main {
             Main {
                 title: flags.title,
                 port: flags.port,
-                // server: ,
                 canvas: FigureProgram::new(),
             },
             Command::none(),
@@ -55,7 +54,10 @@ impl Application for Main {
         message: Self::Message,
         _clipboard: &mut iced::Clipboard,
     ) -> Command<Self::Message> {
-        println!("Received! len = {}", message.2.len());
+        match message {
+            Message::MessageReceived(_, _, buf) => println!("Received! len = {}", buf.len()),
+            Message::ViewUpdated => println!("View Updated!"),
+        };
         Command::none()
     }
 

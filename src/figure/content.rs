@@ -136,16 +136,15 @@ impl TopicContent {
 
 impl Default for Vertex {
     fn default() -> Self {
-        Self {
-            pos: Point::ORIGIN,
-            dir: 0.0,
-            level: 0,
-            tie: false,
-        }
+        Self::DEFAULT
     }
 }
 
-#[test]
-fn assert_size() {
-    assert_eq!(16, std::mem::size_of::<Point>());
+impl Vertex {
+    const DEFAULT: Self = Self {
+        pos: Point::ORIGIN,
+        dir: 0.0,
+        level: 0,
+        tie: false,
+    };
 }

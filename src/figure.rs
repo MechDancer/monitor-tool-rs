@@ -42,6 +42,28 @@ impl Figure {
     /// 接收指令
     pub fn receive(&mut self, buf: &[u8]) {}
 
+    /// 放缩
+    pub fn zoom(&mut self, level: f32, pos: Point, bounds: Size) {
+        // 关闭自动
+        self.auto_view = false;
+        // 计算尺度
+        let k = if level > 0.0 {
+            1.1f32.powf(level)
+        } else {
+            0.9f32.powf(-level)
+        };
+        self.view.scale *= k;
+        // 计算中心偏移
+        let c = Point {
+            x: bounds.width * 0.5,
+            y: bounds.height * 0.5,
+        };
+        let Vector { x, y } = (pos - c) * ((k - 1.0) / self.view.scale);
+        self.view.center = self.view.center + Vector { x, y: -y };
+        // 打日志
+        println!("scale = {}", self.view.scale);
+    }
+
     /// 画图
     pub fn draw(&mut self, bounds: Size, available_bounds: Size) -> (Rectangle, Vec<Geometry>) {
         // 各组同步
