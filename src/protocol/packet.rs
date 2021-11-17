@@ -29,32 +29,23 @@ struct LayerBody {
 struct TopicBody {
     sync_set: u16,
     layer: u16,
-    capacity: u32,
     clear: bool,
+    capacity: u32,
     colors: HashMap<u8, RGBA>,
     vertex: Vec<Vertex>,
 }
 
-macro_rules! update_topic {
-    ($encoder:expr, $topic:expr; $mut:expr, $new:expr) => {
-        match $encoder.topics.entry($topic) {
-            Entry::Occupied(mut entry) => {
-                $mut(entry.get_mut());
-            }
-            Entry::Vacant(entry) => {
-                entry.insert($new);
-            }
+macro_rules! sort {
+    ($map:expr) => {{
+        let mut sorted = vec![None; $map.len()];
+        for (name, body) in &$map {
+            sorted[body.index as usize] = Some((name.as_str(), body));
         }
-    };
-}
-
-macro_rules! hash_map {
-    ($key:expr, $value:expr) => {{
-        let mut map = HashMap::new();
-        map.insert($key, $value);
-        map
+        sorted
     }};
 }
+
+const USIZE_LEN: usize = std::mem::size_of::<u16>();
 
 impl Encoder {
     /// 控制摄像机
@@ -93,13 +84,7 @@ impl Encoder {
         };
         // 更新序号
         for topic in topics.iter().map(|it| it.to_string()) {
-            update_topic!(self, topic;
-                |body: &mut TopicBody| body.sync_set = index,
-                TopicBody {
-                    sync_set: index,
-                    ..Default::default()
-                }
-            )
+            self.topics.entry(topic).or_default().sync_set = index;
         }
     }
 
@@ -128,69 +113,112 @@ impl Encoder {
         };
         // 更新序号
         for topic in topics.iter().map(|it| it.to_string()) {
-            update_topic!(self, topic;
-                |body: &mut TopicBody| body.layer = index,
-                TopicBody {
-                    layer: index,
-                    ..Default::default()
-                }
-            )
+            self.topics.entry(topic).or_default().layer = index;
         }
     }
 
     /// 设置话题颜色
     pub fn topic_set_color(&mut self, topic: impl ToString, level: u8, color: RGBA) {
-        update_topic!(self, topic.to_string();
-            |body: &mut TopicBody| body.colors.insert(level, color),
-            {
-                TopicBody {
-                    colors: hash_map!(level, color),
-                    ..Default::default()
-                }
-            }
-        )
+        self.topics
+            .entry(topic.to_string())
+            .or_default()
+            .colors
+            .insert(level, color);
     }
 
     /// 设置话题容量
     pub fn topic_set_capacity(&mut self, topic: impl ToString, capacity: u32) {
-        update_topic!(self, topic.to_string();
-            |body: &mut TopicBody| body.capacity = capacity,
-            TopicBody {
-                capacity,
-                ..Default::default()
-            }
-        )
+        self.topics.entry(topic.to_string()).or_default().capacity = capacity;
     }
 
     /// 清空话题缓存
     pub fn topic_clear(&mut self, topic: impl ToString) {
-        update_topic!(self, topic.to_string();
-            |body: &mut TopicBody| {
-                body.clear = true;
-                body.vertex.clear();
-            },
-            TopicBody {
-                clear: true,
-                ..Default::default()
+        match self.topics.entry(topic.to_string()) {
+            Entry::Occupied(mut entry) => {
+                let topic = entry.get_mut();
+                topic.clear = true;
+                topic.vertex.clear();
             }
-        )
+            Entry::Vacant(entry) => {
+                entry.insert(TopicBody {
+                    clear: true,
+                    ..Default::default()
+                });
+            }
+        }
     }
 
     /// 保存顶点
     pub fn topic_push(&mut self, topic: impl ToString, vertex: Vertex) {
-        update_topic!(self, topic.to_string();
-            |body: &mut TopicBody| {
-                body.vertex.push(vertex);
-            },
-            TopicBody {
-                vertex: vec![vertex],
-                ..Default::default()
-            }
-        )
+        self.topics
+            .entry(topic.to_string())
+            .or_default()
+            .vertex
+            .push(vertex);
     }
 
     /// 编码
     pub fn encode(self) -> Vec<u8> {
-        todo!()
+        let mut result = Vec::new();
+        // 编码摄像机配置
+        extend_bytes(&self.camera, &mut result);
+        // 编码同步组
+        extend_from_sorted(sort!(self.sync_sets), &mut result, |b| {
+            bytes_of(&b.life_time)
+        });
+        // 编码图层
+        extend_from_sorted(sort!(self.layers), &mut result, |b| bytes_of(&b.visible));
+        // 编码话题
+        for (name, body) in self.topics {
+            extend_bytes(&(name.len() as u16), &mut result);
+            result.extend_from_slice(name.as_bytes());
+            extend_bytes(&body.sync_set, &mut result);
+            extend_bytes(&body.layer, &mut result);
+            extend_bytes(&body.clear, &mut result);
+            extend_bytes(&body.capacity, &mut result);
+            extend_bytes(&(body.colors.len() as u16), &mut result);
+            for (level, rgba) in body.colors {
+                extend_bytes(&level, &mut result);
+                extend_bytes(&rgba, &mut result);
+            }
+            extend_bytes(&(body.vertex.len() as u16), &mut result);
+            for v in body.vertex {
+                extend_bytes(&v, &mut result);
+            }
+        }
+        result
     }
+}
+
+#[inline]
+fn bytes_of<'a, T>(t: &'a T) -> &'a [u8] {
+    unsafe { std::slice::from_raw_parts(t as *const _ as *const u8, std::mem::size_of::<T>()) }
+}
+
+#[inline]
+fn extend_bytes<T>(value: &T, to: &mut Vec<u8>) {
+    to.extend_from_slice(bytes_of(value));
+}
+
+fn extend_from_sorted<T>(
+    sorted: Vec<Option<(&str, &T)>>,
+    result: &mut Vec<u8>,
+    f: fn(&T) -> &[u8],
+) {
+    // 编码同步组
+    result.extend_from_slice(bytes_of(&(sorted.len() as u16)));
+    let mut ptr_len = result.len();
+    let ptr_content = ptr_len + USIZE_LEN * result.len();
+    result.resize(ptr_content, 0);
+    sorted
+        .into_iter()
+        .map(|o| o.unwrap())
+        .for_each(|(name, body)| {
+            result.extend_from_slice(f(body));
+            result.extend_from_slice(name.as_bytes());
+            unsafe {
+                *(result[ptr_len..].as_ptr() as *mut _) = (result.len() - ptr_content) as u16;
+            }
+            ptr_len += USIZE_LEN;
+        });
 }
