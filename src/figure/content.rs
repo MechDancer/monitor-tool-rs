@@ -1,4 +1,5 @@
 ﻿use super::{aabb::AABB, View};
+use crate::Vertex;
 use iced::{canvas::Geometry, Color, Point};
 use std::{
     collections::{HashMap, VecDeque},
@@ -21,14 +22,6 @@ pub(super) struct TopicContent {
     color_map: HashMap<u8, Color>,      // 色彩映射
 
     cache: TopicCache, // 话题的完整缓存
-}
-
-/// 图形顶点
-pub(super) struct Vertex {
-    pub pos: Point,
-    pub dir: f32,
-    pub level: u8,
-    pub tie: bool,
 }
 
 /// 单个绘图对象
@@ -93,7 +86,8 @@ impl TopicContent {
     /// 计算关注范围
     #[inline]
     pub fn aabb(&mut self) -> Option<AABB> {
-        self.cache.aabb(self.queue.iter().map(|(_, v)| v.pos))
+        self.cache
+            .aabb(self.queue.iter().map(|(_, v)| Point { x: v.x, y: v.y }))
     }
 
     /// 画图
@@ -132,19 +126,4 @@ impl TopicContent {
         self.queue.truncate(len);
         self.cache.clear();
     }
-}
-
-impl Default for Vertex {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-impl Vertex {
-    const DEFAULT: Self = Self {
-        pos: Point::ORIGIN,
-        dir: 0.0,
-        level: 0,
-        tie: false,
-    };
 }

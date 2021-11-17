@@ -34,7 +34,11 @@ impl<'a> Items<'a> {
     ) -> Option<Self> {
         let mut iter = queue.iter();
         iter.next().map(|(_, v)| Items {
-            memory: IterMemory::Vertex(v.pos, v.dir, get_or_set!(color_map, v.level, Color::BLACK)),
+            memory: IterMemory::Vertex(
+                Point { x: v.x, y: v.y },
+                v.dir,
+                get_or_set!(color_map, v.level, Color::BLACK),
+            ),
             iter,
             color_map,
         })
@@ -56,15 +60,16 @@ impl<'a> Iterator for Items<'a> {
             }
             IterMemory::Position(p0) => self.iter.next().map(|(_, p)| {
                 let color = get_or_set!(self.color_map, p.level, Color::BLACK);
+                let pos = Point { x: p.x, y: p.y };
                 if p.tie {
-                    self.memory = IterMemory::Vertex(p.pos, p.dir, color);
-                    FigureItem::Tie(p0, p.pos, color)
+                    self.memory = IterMemory::Vertex(pos, p.dir, color);
+                    FigureItem::Tie(p0, pos, color)
                 } else {
-                    self.memory = IterMemory::Position(p.pos);
+                    self.memory = IterMemory::Position(pos);
                     if p.dir.is_nan() {
-                        FigureItem::Point(p.pos, color)
+                        FigureItem::Point(pos, color)
                     } else {
-                        FigureItem::Arrow(p.pos, p.dir, color)
+                        FigureItem::Arrow(pos, p.dir, color)
                     }
                 }
             }),

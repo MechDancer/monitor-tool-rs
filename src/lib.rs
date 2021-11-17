@@ -13,9 +13,19 @@ use std::time::Instant;
 
 mod figure;
 mod figure_canvas;
+mod protocol;
 
 use figure::Figure;
 use figure_canvas::*;
+
+/// 图形顶点
+pub struct Vertex {
+    pub x: f32,
+    pub y: f32,
+    pub dir: f32,
+    pub level: u8,
+    pub tie: bool,
+}
 
 #[derive(Clone)]
 pub struct FigureProgram(Arc<Mutex<FigureCanvas>>);
@@ -32,6 +42,22 @@ struct FigureCanvas {
     update_time: Instant,
     border_cache: Cache,
     figure: Figure,
+}
+
+impl Default for Vertex {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl Vertex {
+    const DEFAULT: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        dir: 0.0,
+        level: 0,
+        tie: false,
+    };
 }
 
 impl FigureProgram {
