@@ -54,9 +54,8 @@ impl Application for Main {
         _clipboard: &mut iced::Clipboard,
     ) -> Command<Self::Message> {
         match message {
-            Message::MessageReceived(_, src, buf) => {
-                println!("Received! len = {}", buf.len());
-                self.canvas.receive(src, buf.as_slice());
+            Message::MessageReceived(time, src, buf) => {
+                self.canvas.receive(time, src, buf.as_slice());
             }
             Message::ViewUpdated => println!("View Updated!"),
         };

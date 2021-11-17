@@ -1,8 +1,16 @@
-﻿use crate::{figure::Figure, protocol::Visible, Camera};
-use std::{net::SocketAddr, time::Duration};
+﻿use crate::{
+    figure::{Figure, TopicTitle},
+    protocol::Visible,
+    Camera, Vertex, RGBA,
+};
+use std::{
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 mod sync_sets_and_layers;
 
+use iced::Color;
 use sync_sets_and_layers::*;
 
 macro_rules! read {
@@ -43,7 +51,7 @@ macro_rules! read_by_tails {
     };
 }
 
-pub(crate) fn decode(figure: &mut Figure, src: SocketAddr, mut buf: &[u8]) {
+pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut buf: &[u8]) {
     // 解析摄像机
     match read!(buf => Camera) {
         Some(camera) => update_camera(figure, camera),
@@ -67,6 +75,77 @@ pub(crate) fn decode(figure: &mut Figure, src: SocketAddr, mut buf: &[u8]) {
             Visible::Invisible => figure.set_visible(layer, false),
         }
     }
+    // 解析话题
+    loop {
+        // 构造话题标题
+        let title = {
+            let len = match read!(buf => u16) {
+                Some(len) => *len as usize,
+                None => return,
+            };
+            let title = match read!(buf => u8; len) {
+                Some(slice) => unsafe { std::str::from_utf8_unchecked(slice) },
+                None => return,
+            };
+            TopicTitle {
+                title: title.to_string(),
+                source: src,
+            }
+        };
+        // 更新同步组
+        match read!(buf => u16) {
+            Some(0) => {}
+            Some(i) => {
+                let (sync_set, _) = sync_sets.get(*i as usize - 1);
+                figure.update_sync_set(&sync_set.to_string(), title.clone());
+            }
+            None => return,
+        }
+        // 更新话题内容
+        let topic = figure.topic_mut(title);
+        // 更新图层
+        match read!(buf => u16) {
+            Some(0) => {}
+            Some(i) => topic.layer = layers.get(*i as usize - 1).0.to_string(),
+            None => return,
+        }
+        // 清除缓存
+        match read!(buf => bool) {
+            Some(false) => {}
+            Some(true) => topic.clear(),
+            None => return,
+        }
+        // 更新容量
+        match read!(buf => u32) {
+            Some(0) => {}
+            Some(n) => topic.set_capacity(*n as usize),
+            None => return,
+        }
+        // 更新颜色
+        match read!(buf => u16) {
+            Some(0) => {}
+            Some(n) => match read!(buf => [u8; 5]; *n) {
+                Some(colors) => {
+                    for color in colors {
+                        let level = color[0];
+                        let rgba = unsafe { *(color[1..].as_ptr() as *const RGBA) };
+                        topic.set_color(level, rgba_to_color(rgba));
+                    }
+                }
+                None => return,
+            },
+            None => return,
+        }
+        // 存入点
+        match read!(buf => u16) {
+            Some(0) => {}
+            Some(n) => match read!(buf => Vertex; *n) {
+                Some(vertexs) => topic.extend_from_slice(time, vertexs),
+                None => return,
+            },
+            None => return,
+        }
+    }
 }
 
 fn update_camera(figure: &mut Figure, camera: &Camera) {
@@ -88,5 +167,15 @@ fn update_camera(figure: &mut Figure, camera: &Camera) {
         } else {
             figure.view.scale = f32::min(*scale_x, *scale_y);
         }
+    }
+}
+
+#[inline]
+fn rgba_to_color(rgba: RGBA) -> Color {
+    Color {
+        r: rgba.0 as f32 / 255.0,
+        g: rgba.1 as f32 / 255.0,
+        b: rgba.2 as f32 / 255.0,
+        a: rgba.3 as f32 / 255.0,
     }
 }

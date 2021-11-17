@@ -13,9 +13,8 @@ use cache::TopicCache;
 use items::Items;
 
 /// 话题内容，用于存储话题状态
-pub(super) struct TopicContent {
-    pub sync_set: String, // 同步组
-    pub layer: String,    // 图层
+pub(crate) struct TopicContent {
+    pub layer: String, // 图层
 
     capacity: usize,                    // 缓存容量
     queue: VecDeque<(Instant, Vertex)>, // 点数据
@@ -32,20 +31,19 @@ enum FigureItem {
     Tie(Point, Point, Color),
 }
 
-impl TopicContent {
-    pub fn new(sync_set: impl ToString, layer: impl ToString) -> Self {
+impl Default for TopicContent {
+    fn default() -> Self {
         Self {
-            sync_set: sync_set.to_string(),
-            layer: layer.to_string(),
-
+            layer: Default::default(),
             capacity: 10000,
             queue: Default::default(),
             color_map: Default::default(),
-
             cache: Default::default(),
         }
     }
+}
 
+impl TopicContent {
     /// 设置队列容量
     #[inline]
     pub fn set_capacity(&mut self, len: usize) {
@@ -97,13 +95,19 @@ impl TopicContent {
     }
 
     /// 向队列添加一组点
-    pub fn push(&mut self, time: Instant, v: impl IntoIterator<Item = Vertex>) {
+    pub fn extend_from_slice(&mut self, time: Instant, v: &[Vertex]) {
         for v in v {
             if self.queue.len() >= self.capacity {
                 self.queue.pop_back();
             }
-            self.queue.push_front((time, v));
+            self.queue.push_front((time, *v));
         }
+        self.cache.clear();
+    }
+
+    /// 从队列移除所有点
+    pub fn clear(&mut self) {
+        self.queue.clear();
         self.cache.clear();
     }
 

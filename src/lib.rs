@@ -20,6 +20,8 @@ use figure_canvas::*;
 pub use protocol::*;
 
 /// 图形顶点
+#[derive(Clone, Copy)]
+#[repr(C)]
 pub struct Vertex {
     pub x: f32,
     pub y: f32,
@@ -72,8 +74,8 @@ impl FigureProgram {
     }
 
     #[inline]
-    pub fn receive(&self, src: SocketAddr, buf: &[u8]) {
-        task::block_on(self.0.lock()).figure.receive(src, buf);
+    pub fn receive(&self, time: Instant, src: SocketAddr, buf: &[u8]) {
+        decode(&mut task::block_on(self.0.lock()).figure, time, src, buf);
     }
 }
 

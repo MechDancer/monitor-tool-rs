@@ -10,7 +10,7 @@ mod aabb;
 mod content;
 
 use aabb::AABB;
-use content::TopicContent;
+pub(crate) use content::TopicContent;
 
 /// 画面
 #[derive(Default)]
@@ -34,17 +34,11 @@ pub(crate) struct View {
 /// 话题标题，用于区分话题
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct TopicTitle {
-    title: String,
-    source: SocketAddr,
+    pub title: String,
+    pub source: SocketAddr,
 }
 
 impl Figure {
-    /// 接收指令
-    pub fn receive(&mut self, src: SocketAddr, buf: &[u8]) {
-        use crate::protocol::decode;
-        decode(self, src, buf);
-    }
-
     /// 放缩
     pub fn zoom(&mut self, level: f32, pos: Point, bounds: Size) {
         // 关闭自动
@@ -132,6 +126,20 @@ impl Figure {
         } else {
             self.visible_layers.remove(&layer.to_string());
         }
+    }
+
+    pub fn update_sync_set(&mut self, sync_set: &String, title: TopicTitle) {
+        let set = &mut self.sync_sets.get_mut(sync_set).unwrap().0;
+        if sync_set.is_empty() {
+            set.remove(&title);
+        } else {
+            set.insert(title);
+        }
+    }
+
+    /// 获取话题对象
+    pub fn topic_mut<'a>(&'a mut self, title: TopicTitle) -> &'a mut TopicContent {
+        self.topics.entry(title).or_default()
     }
 
     /// 同步
