@@ -1,6 +1,9 @@
-﻿use std::{net::SocketAddr, time::Duration};
+﻿use crate::{figure::Figure, protocol::Visible, Camera};
+use std::{net::SocketAddr, time::Duration};
 
-use crate::{figure::Figure, protocol::Visible, Camera};
+mod sync_sets_and_layers;
+
+use sync_sets_and_layers::*;
 
 macro_rules! read {
     ($buf:expr => $ty:ty) => {
@@ -48,13 +51,23 @@ pub(crate) fn decode(figure: &mut Figure, src: SocketAddr, mut buf: &[u8]) {
     }
     // 解析同步组
     let sync_sets = read_by_tails!(buf => SyncSets);
+    for i in 0..sync_sets.len() {
+        let (sync_set, life_time) = sync_sets.get(i);
+        if life_time != &Duration::ZERO {
+            figure.set_life_time(sync_set, *life_time);
+        }
+    }
     // 解析图层
     let layers = read_by_tails!(buf => Layers);
+    for i in 0..sync_sets.len() {
+        let (layer, visible) = layers.get(i);
+        match *visible {
+            Visible::NothingToDo => {}
+            Visible::Visible => figure.set_visible(layer, true),
+            Visible::Invisible => figure.set_visible(layer, false),
+        }
+    }
 }
-
-struct SyncSets<'a>(&'a [u16], &'a [u8]);
-
-struct Layers<'a>(&'a [u16], &'a [u8]);
 
 fn update_camera(figure: &mut Figure, camera: &Camera) {
     let Camera {
@@ -74,34 +87,6 @@ fn update_camera(figure: &mut Figure, camera: &Camera) {
             figure.auto_view = true;
         } else {
             figure.view.scale = f32::min(*scale_x, *scale_y);
-        }
-    }
-}
-
-impl<'a> SyncSets<'a> {
-    fn get(&self, i: usize) -> (&'a Duration, &'a str) {
-        const LEN: usize = std::mem::size_of::<Duration>();
-        let begin = if i == 0 { 0 } else { self.0[i - 1] as usize };
-        let slice = &self.1[begin..self.0[i] as usize];
-        unsafe {
-            (
-                &*(slice.as_ptr() as *const Duration),
-                std::str::from_utf8_unchecked(&slice[LEN..]),
-            )
-        }
-    }
-}
-
-impl<'a> Layers<'a> {
-    fn get(&self, i: usize) -> (&'a Visible, &'a str) {
-        const LEN: usize = std::mem::size_of::<Visible>();
-        let begin = if i == 0 { 0 } else { self.0[i - 1] as usize };
-        let slice = &self.1[begin..self.0[i] as usize];
-        unsafe {
-            (
-                &*(slice.as_ptr() as *const Visible),
-                std::str::from_utf8_unchecked(&slice[LEN..]),
-            )
         }
     }
 }

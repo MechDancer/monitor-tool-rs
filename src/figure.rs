@@ -1,6 +1,6 @@
 ﻿use iced::{canvas::Geometry, Point, Rectangle, Size, Vector};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Display,
     net::SocketAddr,
     time::{Duration, Instant},
@@ -111,6 +111,27 @@ impl Figure {
             },
             geometries,
         )
+    }
+
+    /// 设置同步组时限
+    pub fn set_life_time(&mut self, sync_set: impl ToString, life_time: Duration) {
+        match self.sync_sets.entry(sync_set.to_string()) {
+            Entry::<_, _>::Occupied(mut entry) => {
+                entry.get_mut().1 = life_time;
+            }
+            Entry::<_, _>::Vacant(entry) => {
+                entry.insert((Default::default(), life_time));
+            }
+        }
+    }
+
+    /// 设置图层可见性
+    pub fn set_visible(&mut self, layer: impl ToString, visible: bool) {
+        if visible {
+            self.visible_layers.insert(layer.to_string());
+        } else {
+            self.visible_layers.remove(&layer.to_string());
+        }
     }
 
     /// 同步
