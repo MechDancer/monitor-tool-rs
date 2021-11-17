@@ -35,16 +35,6 @@ struct TopicBody {
     vertex: Vec<Vertex>,
 }
 
-macro_rules! sort {
-    ($map:expr) => {{
-        let mut sorted = vec![None; $map.len()];
-        for (name, body) in &$map {
-            sorted[body.index as usize] = Some((name.as_str(), body));
-        }
-        sorted
-    }};
-}
-
 const USIZE_LEN: usize = std::mem::size_of::<u16>();
 
 impl Encoder {
@@ -163,11 +153,17 @@ impl Encoder {
         // 编码摄像机配置
         extend_bytes(&self.camera, &mut result);
         // 编码同步组
-        extend_from_sorted(sort!(self.sync_sets), &mut result, |b| {
-            bytes_of(&b.life_time)
-        });
+        let mut sorted = vec![None; self.sync_sets.len()];
+        for (name, body) in &self.sync_sets {
+            sorted[body.index as usize] = Some((name.as_str(), &body.life_time));
+        }
+        extend_from_sorted(sorted, &mut result);
         // 编码图层
-        extend_from_sorted(sort!(self.layers), &mut result, |b| bytes_of(&b.visible));
+        let mut sorted = vec![None; self.layers.len()];
+        for (name, body) in &self.layers {
+            sorted[body.index as usize] = Some((name.as_str(), &body.visible));
+        }
+        extend_from_sorted(sorted, &mut result);
         // 编码话题
         for (name, body) in self.topics {
             extend_bytes(&(name.len() as u16), &mut result);
@@ -200,12 +196,8 @@ fn extend_bytes<T>(value: &T, to: &mut Vec<u8>) {
     to.extend_from_slice(bytes_of(value));
 }
 
-fn extend_from_sorted<T>(
-    sorted: Vec<Option<(&str, &T)>>,
-    result: &mut Vec<u8>,
-    f: fn(&T) -> &[u8],
-) {
-    // 编码同步组
+/// 从已排序的集合编码
+fn extend_from_sorted<T>(sorted: Vec<Option<(&str, &T)>>, result: &mut Vec<u8>) {
     result.extend_from_slice(bytes_of(&(sorted.len() as u16)));
     let mut ptr_len = result.len();
     let ptr_content = ptr_len + USIZE_LEN * result.len();
@@ -214,7 +206,7 @@ fn extend_from_sorted<T>(
         .into_iter()
         .map(|o| o.unwrap())
         .for_each(|(name, body)| {
-            result.extend_from_slice(f(body));
+            result.extend_from_slice(bytes_of(body));
             result.extend_from_slice(name.as_bytes());
             unsafe {
                 *(result[ptr_len..].as_ptr() as *mut _) = (result.len() - ptr_content) as u16;
