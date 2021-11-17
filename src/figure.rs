@@ -14,9 +14,9 @@ use content::TopicContent;
 
 /// 画面
 #[derive(Default)]
-pub struct Figure {
-    auto_view: bool,
-    view: View,
+pub(crate) struct Figure {
+    pub auto_view: bool,
+    pub view: View,
 
     topics: HashMap<TopicTitle, TopicContent>,
     visible_layers: HashSet<String>,
@@ -25,10 +25,10 @@ pub struct Figure {
 
 /// 视野
 #[derive(PartialEq, Clone, Copy, Debug)]
-struct View {
-    size: Size,
-    center: Point,
-    scale: f32,
+pub(crate) struct View {
+    pub size: Size,
+    pub center: Point,
+    pub scale: f32,
 }
 
 /// 话题标题，用于区分话题
@@ -40,7 +40,10 @@ pub struct TopicTitle {
 
 impl Figure {
     /// 接收指令
-    pub fn receive(&mut self, buf: &[u8]) {}
+    pub fn receive(&mut self, src: SocketAddr, buf: &[u8]) {
+        use crate::protocol::decode;
+        decode(self, src, buf);
+    }
 
     /// 放缩
     pub fn zoom(&mut self, level: f32, pos: Point, bounds: Size) {

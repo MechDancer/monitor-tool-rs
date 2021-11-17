@@ -17,6 +17,7 @@ mod protocol;
 
 use figure::Figure;
 use figure_canvas::*;
+pub use protocol::*;
 
 /// 图形顶点
 pub struct Vertex {
@@ -71,8 +72,8 @@ impl FigureProgram {
     }
 
     #[inline]
-    pub async fn receive(&self, buf: &[u8]) {
-        self.0.lock().await.figure.receive(buf);
+    pub fn receive(&self, src: SocketAddr, buf: &[u8]) {
+        task::block_on(self.0.lock()).figure.receive(src, buf);
     }
 }
 

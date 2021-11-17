@@ -1,6 +1,5 @@
 ﻿use iced::{executor, Application, Canvas, Command, Settings, Subscription};
 use monitor_tool::{FigureProgram, Message, Server};
-use std::{net::SocketAddr, time::Instant};
 
 fn main() -> iced::Result {
     Main::run(Settings {
@@ -55,7 +54,10 @@ impl Application for Main {
         _clipboard: &mut iced::Clipboard,
     ) -> Command<Self::Message> {
         match message {
-            Message::MessageReceived(_, _, buf) => println!("Received! len = {}", buf.len()),
+            Message::MessageReceived(_, src, buf) => {
+                println!("Received! len = {}", buf.len());
+                self.canvas.receive(src, buf.as_slice());
+            }
             Message::ViewUpdated => println!("View Updated!"),
         };
         Command::none()

@@ -1,11 +1,15 @@
-﻿mod packet;
+﻿mod decode;
+mod packet;
 
+pub(crate) use decode::*;
 pub use packet::*;
 
+/// 颜色
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct RGBA(u8, u8, u8, u8);
 
+/// 摄像机设置
 #[repr(C)]
 pub struct Camera {
     x: f32,
@@ -14,6 +18,7 @@ pub struct Camera {
     scale_y: f32,
 }
 
+/// 图层是否显示
 #[repr(C)]
 enum Visible {
     NothingToDo = 0,
@@ -29,6 +34,7 @@ impl Default for Camera {
 }
 
 impl Camera {
+    /// 不控制摄像机
     pub const DEFAULT: Self = Self {
         x: f32::NAN,
         y: f32::NAN,
@@ -36,6 +42,7 @@ impl Camera {
         scale_y: f32::NAN,
     };
 
+    /// 摄像机自动
     pub const AUTO: Self = Self {
         x: f32::NAN,
         y: f32::NAN,
