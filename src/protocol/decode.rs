@@ -67,7 +67,7 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut bu
     }
     // 解析图层
     let layers = read_by_tails!(buf => Layers);
-    for i in 0..sync_sets.len() {
+    for i in 0..layers.len() {
         let (layer, visible) = layers.get(i);
         match *visible {
             Visible::NothingToDo => {}
@@ -119,6 +119,12 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut bu
         match read!(buf => u32) {
             Some(0) => {}
             Some(n) => topic.set_capacity(*n as usize),
+            None => return,
+        }
+        // 更新关注数量
+        match read!(buf => u32) {
+            Some(0) => {}
+            Some(n) => topic.set_focus(*n as usize),
             None => return,
         }
         // 更新颜色

@@ -31,11 +31,10 @@ struct TopicBody {
     layer: u16,
     clear: bool,
     capacity: u32,
+    focus: u32,
     colors: HashMap<u8, RGBA>,
     vertex: Vec<Vertex>,
 }
-
-const USIZE_LEN: usize = std::mem::size_of::<u16>();
 
 impl Encoder {
     /// 控制摄像机
@@ -55,26 +54,20 @@ impl Encoder {
             return;
         }
         // 获取序号
-        let index = self.sync_sets.len() as u16;
-        let index = match self.sync_sets.entry(set.to_string()) {
-            Entry::Occupied(mut entry) => {
-                let body = entry.get_mut();
-                if let Some(life_time) = life_time {
-                    body.life_time = life_time;
-                }
-                body.index
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(SyncSetBody {
-                    index,
-                    life_time: life_time.unwrap_or(Duration::ZERO),
-                });
-                index
-            }
-        };
+        let next = self.sync_sets.len() as u16;
+        let body = self
+            .sync_sets
+            .entry(set.to_string())
+            .or_insert_with(|| SyncSetBody {
+                index: next,
+                ..Default::default()
+            });
+        if let Some(life_time) = life_time {
+            body.life_time = life_time;
+        }
         // 更新序号
         for topic in topics.iter().map(|it| it.to_string()) {
-            self.topics.entry(topic).or_default().sync_set = index;
+            self.topics.entry(topic).or_default().sync_set = body.index;
         }
     }
 
@@ -84,26 +77,18 @@ impl Encoder {
             return;
         }
         // 获取序号
-        let index = self.layers.len() as u16;
-        let index = match self.layers.entry(layer.to_string()) {
-            Entry::Occupied(mut entry) => {
-                let body = entry.get_mut();
-                if visible.is_some() {
-                    body.visible = visible.into();
-                }
-                body.index
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(LayerBody {
-                    index,
-                    visible: visible.into(),
-                });
-                index
-            }
-        };
+        let next = self.layers.len() as u16;
+        let body = self
+            .layers
+            .entry(layer.to_string())
+            .or_insert_with(|| LayerBody {
+                index: next,
+                ..Default::default()
+            });
+        body.visible = visible.into();
         // 更新序号
         for topic in topics.iter().map(|it| it.to_string()) {
-            self.topics.entry(topic).or_default().layer = index;
+            self.topics.entry(topic).or_default().layer = body.index;
         }
     }
 
@@ -172,6 +157,7 @@ impl Encoder {
             extend_bytes(&body.layer, &mut result);
             extend_bytes(&body.clear, &mut result);
             extend_bytes(&body.capacity, &mut result);
+            extend_bytes(&body.focus, &mut result);
             extend_bytes(&(body.colors.len() as u16), &mut result);
             for (level, rgba) in body.colors {
                 extend_bytes(&level, &mut result);
@@ -198,6 +184,9 @@ fn extend_bytes<T>(value: &T, to: &mut Vec<u8>) {
 
 /// 从已排序的集合编码
 fn extend_from_sorted<T>(sorted: Vec<Option<(&str, &T)>>, result: &mut Vec<u8>) {
+    // 用 u16 保存长度
+    const USIZE_LEN: usize = std::mem::size_of::<u16>();
+
     result.extend_from_slice(bytes_of(&(sorted.len() as u16)));
     let mut ptr_len = result.len();
     let ptr_content = ptr_len + USIZE_LEN * result.len();

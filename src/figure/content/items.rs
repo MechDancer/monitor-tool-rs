@@ -1,7 +1,7 @@
 ﻿use super::{FigureItem, Vertex};
 use iced::{Color, Point};
 use std::{
-    collections::{hash_map::Entry, vec_deque::Iter, HashMap, VecDeque},
+    collections::{vec_deque::Iter, HashMap, VecDeque},
     time::Instant,
 };
 
@@ -18,15 +18,6 @@ enum IterMemory {
     Position(Point),
 }
 
-macro_rules! get_or_set {
-    ($map:expr, $key:expr, $default:expr) => {
-        match $map.entry($key) {
-            Entry::<_, _>::Occupied(entry) => *entry.get(),
-            Entry::<_, _>::Vacant(entry) => *entry.insert($default),
-        }
-    };
-}
-
 impl<'a> Items<'a> {
     pub fn new(
         queue: &'a VecDeque<(Instant, Vertex)>,
@@ -37,7 +28,7 @@ impl<'a> Items<'a> {
             memory: IterMemory::Vertex(
                 Point { x: v.x, y: v.y },
                 v.dir,
-                get_or_set!(color_map, v.level, Color::BLACK),
+                *color_map.entry(v.level).or_insert(Color::BLACK),
             ),
             iter,
             color_map,
@@ -59,7 +50,7 @@ impl<'a> Iterator for Items<'a> {
                 }
             }
             IterMemory::Position(p0) => self.iter.next().map(|(_, p)| {
-                let color = get_or_set!(self.color_map, p.level, Color::BLACK);
+                let color = *self.color_map.entry(p.level).or_insert(Color::BLACK);
                 let pos = Point { x: p.x, y: p.y };
                 if p.tie {
                     self.memory = IterMemory::Vertex(pos, p.dir, color);

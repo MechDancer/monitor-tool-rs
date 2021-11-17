@@ -1,6 +1,6 @@
 ﻿use iced::{canvas::Geometry, Point, Rectangle, Size, Vector};
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt::Display,
     net::SocketAddr,
     time::{Duration, Instant},
@@ -109,14 +109,7 @@ impl Figure {
 
     /// 设置同步组时限
     pub fn set_life_time(&mut self, sync_set: impl ToString, life_time: Duration) {
-        match self.sync_sets.entry(sync_set.to_string()) {
-            Entry::<_, _>::Occupied(mut entry) => {
-                entry.get_mut().1 = life_time;
-            }
-            Entry::<_, _>::Vacant(entry) => {
-                entry.insert((Default::default(), life_time));
-            }
-        }
+        self.sync_sets.entry(sync_set.to_string()).or_default().1 = life_time;
     }
 
     /// 设置图层可见性
