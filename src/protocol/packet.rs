@@ -8,21 +8,15 @@ use std::{
 #[derive(Default)]
 pub struct Encoder {
     camera: Camera,
-    sync_sets: HashMap<String, SyncSetBody>,
-    layers: HashMap<String, LayerBody>,
+    sync_sets: HashMap<String, WithIndex<Duration>>,
+    layers: HashMap<String, WithIndex<Visible>>,
     topics: HashMap<String, TopicBody>,
 }
 
 #[derive(Default)]
-struct SyncSetBody {
+struct WithIndex<T: Default> {
     index: u16,
-    life_time: Duration,
-}
-
-#[derive(Default)]
-struct LayerBody {
-    index: u16,
-    visible: Visible,
+    value: T,
 }
 
 #[derive(Default)]
@@ -34,6 +28,17 @@ struct TopicBody {
     focus: u32,
     colors: HashMap<u8, RGBA>,
     vertex: Vec<Vertex>,
+}
+
+#[inline]
+fn bytes_of<'a, T>(t: &'a T) -> &'a [u8] {
+    unsafe { std::slice::from_raw_parts(t as *const _ as *const u8, std::mem::size_of::<T>()) }
+}
+
+macro_rules! extend {
+    (     $value:expr => $vec:expr) => { $vec.extend_from_slice(bytes_of(&$value)) };
+    (str; $value:expr => $vec:expr) => { $vec.extend_from_slice($value.as_bytes()) };
+    (len; $value:expr => $vec:expr) => { extend!($value as u16 => $vec) };
 }
 
 impl Encoder {
@@ -58,12 +63,12 @@ impl Encoder {
         let body = self
             .sync_sets
             .entry(set.to_string())
-            .or_insert_with(|| SyncSetBody {
+            .or_insert_with(|| WithIndex {
                 index: next,
-                ..Default::default()
+                value: Default::default(),
             });
         if let Some(life_time) = life_time {
-            body.life_time = life_time;
+            body.value = life_time;
         }
         // 更新序号
         for topic in topics.iter().map(|it| it.to_string()) {
@@ -81,11 +86,11 @@ impl Encoder {
         let body = self
             .layers
             .entry(layer.to_string())
-            .or_insert_with(|| LayerBody {
+            .or_insert_with(|| WithIndex {
                 index: next,
-                ..Default::default()
+                value: Default::default(),
             });
-        body.visible = visible.into();
+        body.value = visible.into();
         // 更新序号
         for topic in topics.iter().map(|it| it.to_string()) {
             self.topics.entry(topic).or_default().layer = body.index;
@@ -104,6 +109,11 @@ impl Encoder {
     /// 设置话题容量
     pub fn topic_set_capacity(&mut self, topic: impl ToString, capacity: u32) {
         self.topics.entry(topic.to_string()).or_default().capacity = capacity;
+    }
+
+    /// 设置话题容量
+    pub fn topic_set_focus(&mut self, topic: impl ToString, focus: u32) {
+        self.topics.entry(topic.to_string()).or_default().focus = focus;
     }
 
     /// 清空话题缓存
@@ -136,58 +146,47 @@ impl Encoder {
     pub fn encode(self) -> Vec<u8> {
         let mut result = Vec::new();
         // 编码摄像机配置
-        extend_bytes(&self.camera, &mut result);
+        extend!(self.camera => result);
         // 编码同步组
-        let mut sorted = vec![None; self.sync_sets.len()];
-        for (name, body) in &self.sync_sets {
-            sorted[body.index as usize] = Some((name.as_str(), &body.life_time));
-        }
-        extend_from_sorted(sorted, &mut result);
+        sort_and_encode(&self.sync_sets, &mut result);
         // 编码图层
-        let mut sorted = vec![None; self.layers.len()];
-        for (name, body) in &self.layers {
-            sorted[body.index as usize] = Some((name.as_str(), &body.visible));
-        }
-        extend_from_sorted(sorted, &mut result);
+        sort_and_encode(&self.layers, &mut result);
         // 编码话题
         for (name, body) in self.topics {
-            extend_bytes(&(name.len() as u16), &mut result);
-            result.extend_from_slice(name.as_bytes());
-            extend_bytes(&body.sync_set, &mut result);
-            extend_bytes(&body.layer, &mut result);
-            extend_bytes(&body.clear, &mut result);
-            extend_bytes(&body.capacity, &mut result);
-            extend_bytes(&body.focus, &mut result);
-            extend_bytes(&(body.colors.len() as u16), &mut result);
+            extend!(len; name.len()    => result);
+            extend!(str; name          => result);
+            extend!(     body.sync_set => result);
+            extend!(     body.layer    => result);
+            extend!(     body.clear    => result);
+            extend!(     body.capacity => result);
+            extend!(     body.focus    => result);
+            // 编码颜色
+            extend!(len; body.colors.len() => result);
             for (level, rgba) in body.colors {
-                extend_bytes(&level, &mut result);
-                extend_bytes(&rgba, &mut result);
+                extend!(level => result);
+                extend!(rgba  => result);
             }
-            extend_bytes(&(body.vertex.len() as u16), &mut result);
+            // 编码顶点
+            extend!(len; body.vertex.len() => result);
             for v in body.vertex {
-                extend_bytes(&v, &mut result);
+                extend!(v => result);
             }
         }
         result
     }
 }
 
-#[inline]
-fn bytes_of<'a, T>(t: &'a T) -> &'a [u8] {
-    unsafe { std::slice::from_raw_parts(t as *const _ as *const u8, std::mem::size_of::<T>()) }
-}
-
-#[inline]
-fn extend_bytes<T>(value: &T, to: &mut Vec<u8>) {
-    to.extend_from_slice(bytes_of(value));
-}
-
 /// 从已排序的集合编码
-fn extend_from_sorted<T>(sorted: Vec<Option<(&str, &T)>>, result: &mut Vec<u8>) {
+fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, result: &mut Vec<u8>) {
     // 用 u16 保存长度
     const USIZE_LEN: usize = std::mem::size_of::<u16>();
-
-    result.extend_from_slice(bytes_of(&(sorted.len() as u16)));
+    // 依序号排序
+    let mut sorted = vec![None; map.len()];
+    for (name, body) in map {
+        sorted[body.index as usize] = Some((name.as_str(), &body.value));
+    }
+    // 编码：| 数量 n | 每个尾部位置 × n | 逐个编码 |
+    extend!(len; sorted.len() => result);
     let mut ptr_len = result.len();
     let ptr_content = ptr_len + USIZE_LEN * result.len();
     result.resize(ptr_content, 0);
@@ -195,8 +194,8 @@ fn extend_from_sorted<T>(sorted: Vec<Option<(&str, &T)>>, result: &mut Vec<u8>) 
         .into_iter()
         .map(|o| o.unwrap())
         .for_each(|(name, body)| {
-            result.extend_from_slice(bytes_of(body));
-            result.extend_from_slice(name.as_bytes());
+            extend!(     *body => result);
+            extend!(str;  name => result);
             unsafe {
                 *(result[ptr_len..].as_ptr() as *mut _) = (result.len() - ptr_content) as u16;
             }

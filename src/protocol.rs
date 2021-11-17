@@ -1,7 +1,13 @@
-﻿mod decode;
+﻿#[cfg(feature = "app")]
+mod decode;
+
+#[cfg(feature = "app")]
+pub(crate) use decode::decode;
+
+#[cfg(feature = "sender")]
 mod packet;
 
-pub(crate) use decode::*;
+#[cfg(feature = "sender")]
 pub use packet::*;
 
 /// 颜色
@@ -19,7 +25,6 @@ pub struct Camera {
 }
 
 /// 图层是否显示
-#[repr(C)]
 enum Visible {
     NothingToDo = 0,
     Visible = 0x55,

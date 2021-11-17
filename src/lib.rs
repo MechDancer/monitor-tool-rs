@@ -20,20 +20,21 @@ use figure_canvas::*;
 pub use protocol::*;
 
 /// 图形顶点
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 #[repr(C)]
 pub struct Vertex {
-    pub x: f32,
-    pub y: f32,
-    pub dir: f32,
-    pub level: u8,
-    pub tie: bool,
+    pub x: f32,     // 位置 x
+    pub y: f32,     // 位置 y
+    pub dir: f32,   // 方向 θ
+    pub level: u8,  // 等级
+    pub tie: bool,  // 是否与上一个点相连
+    pub _zero: u16, // 占位
 }
 
 #[derive(Clone)]
 pub struct FigureProgram(Arc<Mutex<FigureCanvas>>);
 
-pub struct Server(u16);
+pub struct UdpReceiver(u16);
 
 #[derive(Debug)]
 pub enum Message {
@@ -45,22 +46,6 @@ struct FigureCanvas {
     update_time: Instant,
     border_cache: Cache,
     figure: Figure,
-}
-
-impl Default for Vertex {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-impl Vertex {
-    const DEFAULT: Self = Self {
-        x: 0.0,
-        y: 0.0,
-        dir: 0.0,
-        level: 0,
-        tie: false,
-    };
 }
 
 impl FigureProgram {
@@ -150,13 +135,13 @@ impl FigureCanvas {
     }
 }
 
-impl Server {
+impl UdpReceiver {
     pub const fn new(port: u16) -> Self {
         Self(port)
     }
 }
 
-impl<H, E> Recipe<H, E> for Server
+impl<H, E> Recipe<H, E> for UdpReceiver
 where
     H: std::hash::Hasher,
 {

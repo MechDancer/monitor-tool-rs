@@ -3,6 +3,7 @@
     protocol::Visible,
     Camera, Vertex, RGBA,
 };
+use iced::Color;
 use std::{
     net::SocketAddr,
     time::{Duration, Instant},
@@ -10,7 +11,6 @@ use std::{
 
 mod sync_sets_and_layers;
 
-use iced::Color;
 use sync_sets_and_layers::*;
 
 macro_rules! read {

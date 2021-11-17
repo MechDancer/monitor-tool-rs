@@ -1,5 +1,5 @@
 ﻿use iced::{executor, Application, Canvas, Command, Settings, Subscription};
-use monitor_tool::{FigureProgram, Message, Server};
+use monitor_tool::{FigureProgram, Message, UdpReceiver};
 
 fn main() -> iced::Result {
     Main::run(Settings {
@@ -45,7 +45,7 @@ impl Application for Main {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        Subscription::from_recipe(Server::new(self.port))
+        Subscription::from_recipe(UdpReceiver::new(self.port))
     }
 
     fn update(

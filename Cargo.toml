@@ -6,6 +6,15 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 readme = "README.md"
 
 [dependencies]
-iced = { version = "*", features = ["glow", "glow_canvas", "async-std"] }
-iced_futures = "*"
-async-std = "*"
+iced = { version = "*", optional = true, features = [
+    "glow",
+    "glow_canvas",
+    "async-std",
+] }
+iced_futures = { version = "*", optional = true }
+async-std = { version = "*", optional = true }
+
+[features]
+default = ["app", "sender"]
+app = ["iced", "iced_futures", "async-std"]
+sender = []
