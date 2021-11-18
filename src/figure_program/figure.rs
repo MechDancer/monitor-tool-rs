@@ -1,25 +1,36 @@
 ﻿use async_std::task;
-use iced::{canvas::Geometry, Point, Rectangle, Size, Vector};
+use iced::{
+    canvas::{Cache, Geometry},
+    Color, Point, Rectangle, Size, Vector,
+};
 use std::{
     collections::{HashMap, HashSet},
     time::{Duration, Instant},
 };
 
 mod aabb;
+mod border;
 mod content;
 
 use aabb::AABB;
+use border::border;
+pub(super) use border::{is_available, mark_cross};
 pub(crate) use content::TopicContent;
 
+use self::border::available_size;
+
 /// 画面
-#[derive(Default)]
 pub(crate) struct Figure {
+    update_time: Instant,
+
     pub auto_view: bool,
     view: View,
 
     topics: HashMap<String, Option<Box<TopicContent>>>,
     visible_layers: HashSet<String>,
     sync_sets: HashMap<String, (HashSet<String>, Duration)>,
+
+    border_cache: Cache,
 }
 
 /// 视野
@@ -40,6 +51,21 @@ macro_rules! unwrap {
 }
 
 impl Figure {
+    pub fn new() -> Self {
+        Self {
+            update_time: Instant::now(),
+
+            auto_view: false,
+            view: View::DEFAULT,
+
+            topics: Default::default(),
+            visible_layers: Default::default(),
+            sync_sets: Default::default(),
+
+            border_cache: Default::default(),
+        }
+    }
+
     /// 设置视角
     pub fn set_view(&mut self, x: f32, y: f32, scale_x: f32, scale_y: f32) {
         let old = self.view;
@@ -81,10 +107,10 @@ impl Figure {
     }
 
     /// 画图
-    pub fn draw(&mut self, bounds: Size, available_bounds: Size) -> (Rectangle, Vec<Geometry>) {
-        let now = Instant::now();
+    pub fn draw(&mut self, bounds: Size) -> (Rectangle, Vec<Geometry>) {
+        let time = Instant::now();
         // 各组同步
-        self.sync(now);
+        self.sync(time);
         self.view.size = bounds;
         // 计算自动范围
         if self.auto_view {
@@ -93,6 +119,7 @@ impl Figure {
                 self.view.center = aabb.center();
 
                 let Size { width, height } = aabb.size();
+                let available_bounds = available_size(bounds);
                 let new = f32::min(
                     available_bounds.width / width,
                     available_bounds.height / height,
@@ -130,6 +157,23 @@ impl Figure {
                 })
             })
             .collect::<Vec<_>>();
+        let mut geometries = Vec::with_capacity(tasks.len() + 1);
+        // 绘制边框
+        geometries.push(
+            self.border_cache
+                .draw(bounds, |frame| border(frame, Color::BLACK)),
+        );
+        // 收集异步绘图结果
+        geometries.extend(
+            tasks
+                .into_iter()
+                .map(|handle| task::block_on(handle))
+                .filter_map(|(name, content, geometry)| {
+                    *self.topics.get_mut(&name).unwrap() = Some(content);
+                    geometry
+                }),
+        );
+        self.timer(time);
         (
             Rectangle {
                 x: self.view.center.x - diagonal.x,
@@ -137,14 +181,7 @@ impl Figure {
                 width: diagonal.x * 2.0,
                 height: diagonal.y * 2.0,
             },
-            tasks
-                .into_iter()
-                .map(|handle| task::block_on(handle))
-                .filter_map(|(name, content, geometry)| {
-                    *self.topics.get_mut(&name).unwrap() = Some(content);
-                    geometry
-                })
-                .collect(),
+            geometries,
         )
     }
 
@@ -180,10 +217,10 @@ impl Figure {
     }
 
     /// 同步
-    fn sync(&mut self, now: Instant) {
+    fn sync(&mut self, time: Instant) {
         for (set, life_time) in self.sync_sets.values_mut() {
             // 按当前时间计算期限
-            let deadline0 = now.checked_sub(*life_time);
+            let deadline0 = time.checked_sub(*life_time);
             // 按数量消除并计算期限
             let deadline1 = set
                 .iter()
@@ -219,6 +256,16 @@ impl Figure {
             unwrap!(mut; content).redraw();
         }
     }
+
+    #[inline]
+    fn timer(&mut self, time: Instant) {
+        // 计时
+        println!(
+            "period = {:?}, delay = {:?}",
+            time - std::mem::replace(&mut self.update_time, time),
+            Instant::now() - time,
+        );
+    }
 }
 
 #[inline]
@@ -232,12 +279,6 @@ fn to_canvas(p: Point, center: Point) -> Point {
     Point {
         x: p.x - center.x,
         y: center.y - p.y,
-    }
-}
-
-impl Default for View {
-    fn default() -> Self {
-        Self::DEFAULT
     }
 }
 

@@ -1,26 +1,24 @@
-﻿use async_std::{
+﻿use crate::decode;
+use async_std::{
     net::UdpSocket,
     sync::{Arc, Mutex},
     task,
 };
 use iced::{
-    canvas::{event, Cache, Cursor, Event, Geometry, Program},
+    canvas::{event, Cursor, Event, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    mouse, Color, Rectangle, Size,
+    mouse, Rectangle,
 };
 use iced_futures::subscription::Recipe;
 use std::time::Instant;
 
 mod figure;
-mod figure_canvas;
 
 pub(crate) use figure::Figure;
-use figure_canvas::*;
-
-use crate::decode;
+use figure::{is_available, mark_cross};
 
 #[derive(Clone)]
-pub struct FigureProgram(Arc<Mutex<FigureCanvas>>);
+pub struct FigureProgram(Arc<Mutex<Figure>>);
 
 pub struct UdpReceiver(u16);
 
@@ -30,25 +28,15 @@ pub enum Message {
     ViewUpdated,
 }
 
-struct FigureCanvas {
-    update_time: Instant,
-    border_cache: Cache,
-    figure: Figure,
-}
-
 impl FigureProgram {
     #[inline]
     pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(FigureCanvas {
-            update_time: Instant::now(),
-            border_cache: Default::default(),
-            figure: Default::default(),
-        })))
+        Self(Arc::new(Mutex::new(Figure::new())))
     }
 
     #[inline]
     pub fn receive(&self, time: Instant, buf: &[u8]) {
-        decode(&mut task::block_on(self.0.lock()).figure, time, buf);
+        decode(&mut task::block_on(self.0.lock()), time, buf);
     }
 }
 
@@ -73,7 +61,7 @@ impl Program<Message> for FigureProgram {
                     delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
                 } => {
                     task::block_on(async {
-                        let figure = &mut self.0.lock().await.figure;
+                        let figure = &mut self.0.lock().await;
                         figure.auto_view = false;
                         figure.zoom(y, pos, bounds);
                     });
@@ -103,26 +91,6 @@ impl Program<Message> for FigureProgram {
             }
         }
         mouse::Interaction::default()
-    }
-}
-
-impl FigureCanvas {
-    fn draw(&mut self, size: Size) -> (Rectangle, Vec<Geometry>) {
-        let time = Instant::now();
-        // 绘制数据
-        let mut result = self.figure.draw(size, available_size(size));
-        // 绘制边框
-        result.1.push(
-            self.border_cache
-                .draw(size, |frame| border(frame, Color::BLACK)),
-        );
-        // 计时
-        println!(
-            "period = {:?}, delay = {:?}",
-            time - std::mem::replace(&mut self.update_time, time),
-            Instant::now() - time,
-        );
-        result
     }
 }
 

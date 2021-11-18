@@ -18,17 +18,10 @@ pub struct RGBA(pub u8, pub u8, pub u8, pub u8);
 /// 摄像机设置
 #[repr(C)]
 pub struct Camera {
-    x: f32,
-    y: f32,
-    scale_x: f32,
-    scale_y: f32,
-}
-
-/// 图层是否显示
-enum Visible {
-    NothingToDo = 0,
-    Visible = 0x55,
-    Invisible = 0xaa,
+    x: f32,       // 中心点横坐标
+    y: f32,       // 中心点纵坐标
+    scale_x: f32, // TODO 应该改为宽
+    scale_y: f32, // TODO 应该改为高
 }
 
 impl Default for Camera {
@@ -54,6 +47,13 @@ impl Camera {
         scale_x: 0.0,
         scale_y: 0.0,
     };
+}
+
+/// 图层是否显示
+enum Visible {
+    NothingToDo = 0,
+    Visible = 0x55,
+    Invisible = 0xaa,
 }
 
 impl Default for Visible {

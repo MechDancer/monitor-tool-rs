@@ -11,17 +11,6 @@ pub(super) fn available_size(size: Size) -> Size {
 }
 
 #[inline]
-pub(super) fn is_available(size: Size, p: Point) -> bool {
-    Rectangle {
-        x: BORDER_OFFSET.x,
-        y: BORDER_OFFSET.y,
-        width: size.width - 2.0 * BORDER_OFFSET.x,
-        height: size.height - 2.0 * BORDER_OFFSET.y,
-    }
-    .contains(p)
-}
-
-#[inline]
 pub(super) fn border(frame: &mut Frame, color: Color) {
     let Size { width, height } = frame.size();
     frame.stroke(
@@ -40,7 +29,18 @@ pub(super) fn border(frame: &mut Frame, color: Color) {
     );
 }
 
-pub(super) fn mark_cross(bounds: Size, p: Point, rectangle: Rectangle) -> Geometry {
+#[inline]
+pub(crate) fn is_available(size: Size, p: Point) -> bool {
+    Rectangle {
+        x: BORDER_OFFSET.x,
+        y: BORDER_OFFSET.y,
+        width: size.width - 2.0 * BORDER_OFFSET.x,
+        height: size.height - 2.0 * BORDER_OFFSET.y,
+    }
+    .contains(p)
+}
+
+pub(crate) fn mark_cross(bounds: Size, p: Point, rectangle: Rectangle) -> Geometry {
     let mut frame = Frame::new(bounds);
     let Size { width, height } = frame.size();
     text(
