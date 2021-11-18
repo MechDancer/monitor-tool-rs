@@ -6,7 +6,7 @@
 use iced::{
     canvas::{event, Cache, Cursor, Event, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    mouse, Color, Rectangle, Size,
+    mouse, Color, Point, Rectangle, Size,
 };
 use iced_futures::subscription::Recipe;
 use std::time::Instant;
@@ -46,6 +46,16 @@ struct FigureCanvas {
     update_time: Instant,
     border_cache: Cache,
     figure: Figure,
+}
+
+impl Vertex {
+    #[inline]
+    pub fn pos(&self) -> Point {
+        Point {
+            x: self.x,
+            y: self.y,
+        }
+    }
 }
 
 impl FigureProgram {

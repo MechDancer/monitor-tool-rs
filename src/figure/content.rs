@@ -44,6 +44,12 @@ impl Default for TopicContent {
 }
 
 impl TopicContent {
+    /// 重绘
+    #[inline]
+    pub fn redraw(&mut self) {
+        self.cache.redraw();
+    }
+
     /// 设置队列容量
     #[inline]
     pub fn set_capacity(&mut self, len: usize) {
@@ -69,12 +75,6 @@ impl TopicContent {
         }
     }
 
-    /// 设置变换
-    #[inline]
-    pub fn set_config(&mut self, config: View) {
-        self.cache.set_config(config);
-    }
-
     /// 获取时间范围
     #[inline]
     pub fn begin(&self) -> Option<Instant> {
@@ -90,8 +90,9 @@ impl TopicContent {
 
     /// 画图
     #[inline]
-    pub fn draw(&mut self, aabb: AABB) -> Option<Geometry> {
-        Items::new(&self.queue, &mut self.color_map, aabb).map(|items| self.cache.draw(items))
+    pub fn draw(&mut self, view: View, aabb: AABB) -> Option<Geometry> {
+        Items::new(&self.queue, &mut self.color_map, view.center, aabb)
+            .map(|items| self.cache.draw(items, view.size, view.scale))
     }
 
     /// 向队列添加一组点

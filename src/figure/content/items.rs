@@ -1,4 +1,4 @@
-﻿use crate::figure::aabb;
+﻿use crate::figure::to_canvas;
 
 use super::{FigureItem, Vertex, AABB};
 use iced::{Color, Point};
@@ -10,6 +10,7 @@ use std::{
 /// 产生绘图对象的迭代器
 pub(super) struct Items<'a> {
     memory: IterMemory,
+    center: Point,
     aabb: AABB,
     iter: Iter<'a, (Instant, Vertex)>,
     color_map: &'a mut HashMap<u8, Color>,
@@ -25,15 +26,17 @@ impl<'a> Items<'a> {
     pub fn new(
         queue: &'a VecDeque<(Instant, Vertex)>,
         color_map: &'a mut HashMap<u8, Color>,
+        center: Point,
         aabb: AABB,
     ) -> Option<Self> {
         let mut iter = queue.iter();
         iter.next().map(|(_, v)| Items {
             memory: IterMemory::Vertex(
-                Point { x: v.x, y: v.y },
-                v.dir,
+                to_canvas(v.pos(), center),
+                -v.dir,
                 *color_map.entry(v.level).or_insert(Color::BLACK),
             ),
+            center,
             aabb,
             iter,
             color_map,
@@ -62,21 +65,21 @@ impl<'a> Iterator for Items<'a> {
                     if p.is_none() {
                         return None;
                     }
-                    let p = p.unwrap().1;
-                    let color = *self.color_map.entry(p.level).or_insert(Color::BLACK);
-                    let pos = Point { x: p.x, y: p.y };
-                    if p.tie {
-                        self.memory = IterMemory::Vertex(pos, p.dir, color);
+                    let v = p.unwrap().1;
+                    let color = *self.color_map.entry(v.level).or_insert(Color::BLACK);
+                    let pos = to_canvas(v.pos(), self.center);
+                    if v.tie {
+                        self.memory = IterMemory::Vertex(pos, -v.dir, color);
                         if self.aabb.contains(p0) || self.aabb.contains(pos) {
                             return Some(FigureItem::Tie(p0, pos, color));
                         }
                     } else {
                         self.memory = IterMemory::Position(pos);
                         if self.aabb.contains(pos) {
-                            return if p.dir.is_nan() {
+                            return if v.dir.is_nan() {
                                 Some(FigureItem::Point(pos, color))
                             } else {
-                                Some(FigureItem::Arrow(pos, p.dir, color))
+                                Some(FigureItem::Arrow(pos, v.dir, color))
                             };
                         }
                     }

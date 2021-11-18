@@ -61,6 +61,7 @@ impl Figure {
         // 计算自动范围
         if self.auto_view {
             if let Some(aabb) = self.aabb() {
+                let old = self.view;
                 self.view.center = aabb.center();
 
                 let Size { width, height } = aabb.size();
@@ -71,6 +72,11 @@ impl Figure {
                 if new.is_finite() {
                     self.view.scale = new;
                 }
+                if self.view != old {
+                    for content in self.topics.values_mut() {
+                        content.redraw();
+                    }
+                }
             }
         }
         // 计算对角线
@@ -78,17 +84,17 @@ impl Figure {
             x: bounds.width,
             y: bounds.height,
         } * (0.5 / self.view.scale);
-        let aabb =
-            AABB::foreach([self.view.center - diagonal, self.view.center + diagonal]).unwrap();
+        let aabb = AABB::foreach([
+            to_canvas(self.view.center - diagonal, self.view.center),
+            to_canvas(self.view.center + diagonal, self.view.center),
+        ])
+        .unwrap();
         // 写入配置并绘制
         let geometries = self
             .topics
             .values_mut()
             .filter(|content| check_visible(&self.visible_layers, &content.layer))
-            .filter_map(|content| {
-                content.set_config(self.view);
-                content.draw(aabb)
-            })
+            .filter_map(|content| content.draw(self.view, aabb))
             .collect();
         (
             Rectangle {
@@ -165,6 +171,14 @@ impl Figure {
 #[inline]
 fn check_visible(set: &HashSet<String>, layer: &String) -> bool {
     layer.is_empty() || set.contains(layer)
+}
+
+#[inline]
+fn to_canvas(p: Point, center: Point) -> Point {
+    Point {
+        x: p.x - center.x,
+        y: center.y - p.y,
+    }
 }
 
 impl Default for View {

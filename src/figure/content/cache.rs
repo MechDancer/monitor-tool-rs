@@ -1,15 +1,13 @@
-﻿use super::{FigureItem, Items, View, AABB};
+﻿use super::{FigureItem, Items, AABB};
 use iced::{
     canvas::{Cache, Geometry, Path, Stroke},
-    Point, Vector,
+    Point, Size, Vector,
 };
 
 #[derive(Default)]
 pub(super) struct TopicCache {
     focus_len: usize,
     bound: Bound,
-
-    config: View,
     cache: Cache,
 }
 
@@ -54,30 +52,24 @@ impl TopicCache {
     }
 
     /// 画图
-    pub fn draw(&mut self, items: Items) -> Geometry {
-        let View {
-            size,
-            center,
-            scale,
-        } = self.config;
+    pub fn draw(&mut self, items: Items, size: Size, scale: f32) -> Geometry {
         let items = items.collect::<Vec<_>>();
         self.cache.draw(size, |frame| {
             frame.translate(frame.center() - Point::ORIGIN);
+            frame.scale(scale);
+            let radius = 2.0 / scale;
             for item in items.iter().copied() {
                 match item {
                     FigureItem::Point(p, color) => {
-                        let Vector { x, y } = (p - center) * scale;
-                        frame.fill(&Path::circle(Point { x, y: -y }, 1.0), color);
+                        frame.fill(&Path::circle(p, radius), color);
                     }
                     FigureItem::Arrow(p, d, color) => {
-                        let Vector { x, y } = (p - center) * scale;
-                        let p = Point { x, y: -y };
                         let (sin, cos) = d.sin_cos();
                         let d = Vector {
                             x: cos * 15.0,
                             y: sin * -15.0,
                         };
-                        frame.fill(&Path::circle(p, 2.0), color);
+                        frame.fill(&Path::circle(p, radius), color);
                         frame.stroke(
                             &Path::line(p, p + d),
                             Stroke {
@@ -88,12 +80,6 @@ impl TopicCache {
                         );
                     }
                     FigureItem::Tie(p0, p1, color) => {
-                        let Vector { x, y } = (p0 - center) * scale;
-                        let p0 = Point { x, y: -y };
-
-                        let Vector { x, y } = (p1 - center) * scale;
-                        let p1 = Point { x, y: -y };
-
                         frame.stroke(
                             &Path::line(p0, p1),
                             Stroke {
@@ -113,14 +99,6 @@ impl TopicCache {
         if self.focus_len != len {
             self.focus_len = len;
             self.rebound();
-        }
-    }
-
-    #[inline]
-    pub fn set_config(&mut self, config: View) {
-        if self.config != config {
-            self.config = config;
-            self.redraw();
         }
     }
 
