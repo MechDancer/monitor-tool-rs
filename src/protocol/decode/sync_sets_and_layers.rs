@@ -1,4 +1,4 @@
-﻿use crate::protocol::Visible;
+﻿use super::Visible;
 use std::time::Duration;
 
 #[derive(Clone, Copy)]

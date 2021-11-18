@@ -205,33 +205,31 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Ve
 
 #[test]
 fn send() {
-    use async_std::{net::UdpSocket, task};
-    task::block_on(async {
-        let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
-        for i in 0.. {
-            let mut encoder = Encoder::default();
-            if i == 0 {
-                encoder.camera(Camera::AUTO);
-                encoder.topic_set_capacity("test", 100000);
-                encoder.topic_set_focus("test", 1000);
-                encoder.topic_clear("test");
-            }
-            for j in 0..100 {
-                let x = (100 * i + j) as f32 * 0.1;
-                encoder.topic_push(
-                    "test",
-                    Vertex {
-                        x,
-                        y: 2.0 * x.sin(),
-                        dir: f32::NAN,
-                        level: 0,
-                        tie: true,
-                        _zero: 0,
-                    },
-                );
-            }
-            let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345").await;
-            task::sleep(Duration::from_millis(20)).await;
+    use std::{net::UdpSocket, thread};
+    let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+    for i in 0.. {
+        let mut encoder = Encoder::default();
+        if i == 0 {
+            encoder.camera(Camera::AUTO);
+            encoder.topic_set_capacity("test", 100000);
+            encoder.topic_set_focus("test", 1000);
+            encoder.topic_clear("test");
         }
-    });
+        for j in 0..100 {
+            let x = (100 * i + j) as f32 * 0.1;
+            encoder.topic_push(
+                "test",
+                Vertex {
+                    x,
+                    y: 2.0 * x.sin(),
+                    dir: f32::NAN,
+                    level: 0,
+                    tie: true,
+                    _zero: 0,
+                },
+            );
+        }
+        let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
+        thread::sleep(Duration::from_millis(20));
+    }
 }

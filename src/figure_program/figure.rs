@@ -24,7 +24,7 @@ pub(crate) struct Figure {
 
 /// 视野
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub(super) struct View {
+pub(crate) struct View {
     pub size: Size,
     pub center: Point,
     pub scale: f32,

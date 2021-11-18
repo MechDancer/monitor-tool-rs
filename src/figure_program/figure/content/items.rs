@@ -1,4 +1,4 @@
-﻿use crate::figure::to_canvas;
+﻿use crate::figure_program::figure::to_canvas;
 
 use super::{FigureItem, Vertex, AABB};
 use iced::{Color, Point};

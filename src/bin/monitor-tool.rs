@@ -1,72 +1,83 @@
-﻿use iced::{executor, Application, Canvas, Command, Settings, Subscription};
-use monitor_tool::{FigureProgram, Message, UdpReceiver};
-
-fn main() -> iced::Result {
-    Main::run(Settings {
-        antialiasing: true,
-        flags: Flags {
-            title: "Figure1".into(),
-            port: 12345,
-        },
-        ..Default::default()
-    })
+﻿fn main() {
+    #[cfg(feature = "app")]
+    app::run();
 }
 
-#[derive(Default, Debug)]
-struct Flags {
-    title: String,
-    port: u16,
-}
+#[cfg(feature = "sender")]
+mod sender {}
 
-struct Main {
-    title: String,
-    port: u16,
-    canvas: FigureProgram,
-}
+#[cfg(feature = "app")]
+mod app {
+    use iced::{executor, Application, Canvas, Command, Settings, Subscription};
+    use monitor_tool::{FigureProgram, Message, UdpReceiver};
 
-impl Application for Main {
-    type Executor = executor::Default;
-    type Message = Message;
-    type Flags = Flags;
-
-    fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        (
-            Main {
-                title: flags.title,
-                port: flags.port,
-                canvas: FigureProgram::new(),
+    pub fn run() {
+        let _ = Main::run(Settings {
+            antialiasing: true,
+            flags: Flags {
+                title: "Figure1".into(),
+                port: 12345,
             },
-            Command::none(),
-        )
+            ..Default::default()
+        });
     }
 
-    fn title(&self) -> String {
-        format!("{}: {}", self.title, self.port)
+    #[derive(Default, Debug)]
+    struct Flags {
+        pub title: String,
+        pub port: u16,
     }
 
-    fn subscription(&self) -> Subscription<Self::Message> {
-        Subscription::from_recipe(UdpReceiver::new(self.port))
+    struct Main {
+        title: String,
+        port: u16,
+        canvas: FigureProgram,
     }
 
-    fn update(
-        &mut self,
-        message: Self::Message,
-        _clipboard: &mut iced::Clipboard,
-    ) -> Command<Self::Message> {
-        match message {
-            Message::MessageReceived(time, buf) => {
-                self.canvas.receive(time, buf.as_slice());
-            }
-            Message::ViewUpdated => println!("View Updated!"),
-        };
-        Command::none()
-    }
+    impl Application for Main {
+        type Executor = executor::Default;
+        type Message = Message;
+        type Flags = Flags;
 
-    fn view(&mut self) -> iced::Element<'_, Self::Message> {
-        use iced::Length::Fill;
-        Canvas::new(self.canvas.clone())
-            .width(Fill)
-            .height(Fill)
-            .into()
+        fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
+            (
+                Main {
+                    title: flags.title,
+                    port: flags.port,
+                    canvas: FigureProgram::new(),
+                },
+                Command::none(),
+            )
+        }
+
+        fn title(&self) -> String {
+            format!("{}: {}", self.title, self.port)
+        }
+
+        fn subscription(&self) -> Subscription<Self::Message> {
+            Subscription::from_recipe(UdpReceiver::new(self.port))
+        }
+
+        fn update(
+            &mut self,
+            message: Self::Message,
+            _clipboard: &mut iced::Clipboard,
+        ) -> Command<Self::Message> {
+            match message {
+                Message::MessageReceived(time, buf) => {
+                    self.canvas.receive(time, buf.as_slice());
+                }
+                Message::ViewUpdated => println!("View Updated!"),
+            };
+            Command::none()
+        }
+
+        fn view(&mut self) -> iced::Element<'_, Self::Message> {
+            use iced::Length::Fill;
+            Canvas::new(self.canvas.clone())
+                .width(Fill)
+                .height(Fill)
+                .into()
+        }
     }
 }

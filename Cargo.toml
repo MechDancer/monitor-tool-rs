@@ -15,6 +15,6 @@ iced_futures = { version = "*", optional = true }
 async-std = { version = "*", optional = true }
 
 [features]
-default = ["app", "sender"]
+default = ["sender", "app"]
 app = ["iced", "iced_futures", "async-std"]
 sender = []
