@@ -1,11 +1,16 @@
-﻿use async_std::{channel::Sender, net::UdpSocket, sync::Arc, task};
+﻿use std::time::Instant;
+
+use async_std::{
+    channel::{Receiver, Sender},
+    sync::{Arc, Mutex},
+    task,
+};
 use iced::{
     canvas::{event, Cursor, Event, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    mouse, Point, Rectangle, Size,
+    mouse, Point, Rectangle,
 };
 use iced_futures::subscription::Recipe;
-use std::time::Instant;
 
 mod figure;
 
@@ -13,28 +18,38 @@ pub(crate) use figure::Figure;
 use figure::{is_available, mark_cross};
 
 #[derive(Clone)]
-pub struct FigureProgram(pub Sender<FigureEvent>, pub Rectangle, pub Vec<Geometry>);
+pub struct FigureProgram {
+    pub sender: Sender<FigureEvent>,
+    pub state: (Rectangle, Vec<Geometry>),
+    bounds: Arc<Mutex<Rectangle>>,
+}
 
-pub struct UdpReceiver(u16);
+pub struct CacheComplete(pub Receiver<(Rectangle, Vec<Geometry>)>);
 
 #[derive(Debug)]
-pub enum Message {
-    MessageReceived(Instant, Vec<u8>),
-    ViewUpdated,
-}
-
 pub enum FigureEvent {
     Zoom(Point, Rectangle, f32),
-    Resize(Size),
+    Resize(Rectangle),
+    Packet(Instant, Vec<u8>),
 }
 
-impl Program<Message> for FigureProgram {
+impl FigureProgram {
+    pub fn new(sender: Sender<FigureEvent>) -> Self {
+        Self {
+            sender,
+            state: Default::default(),
+            bounds: Default::default(),
+        }
+    }
+}
+
+impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
     fn update(
         &mut self,
         event: Event,
         bounds: Rectangle,
         cursor: Cursor,
-    ) -> (event::Status, Option<Message>) {
+    ) -> (event::Status, Option<(Rectangle, Vec<Geometry>)>) {
         let pos = if let Some(position) = cursor.position_in(&bounds) {
             position
         } else {
@@ -47,7 +62,7 @@ impl Program<Message> for FigureProgram {
                 WheelScrolled {
                     delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
                 } => {
-                    let _ = task::block_on(self.0.send(FigureEvent::Zoom(pos, bounds, y)));
+                    let _ = task::block_on(self.sender.send(FigureEvent::Zoom(pos, bounds, y)));
                 }
                 _ => {}
             },
@@ -57,11 +72,15 @@ impl Program<Message> for FigureProgram {
     }
 
     fn draw(&self, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry> {
-        let _ = task::block_on(self.0.send(FigureEvent::Resize(bounds.size())));
-        let mut geometries = self.2.clone();
+        let mut memory = task::block_on(self.bounds.lock());
+        if bounds != *memory {
+            *memory = bounds;
+            let _ = task::block_on(self.sender.send(FigureEvent::Resize(bounds)));
+        }
+        let mut geometries = self.state.1.clone();
         if let Cursor::Available(p) = cursor {
             if is_available(bounds, p) {
-                geometries.push(mark_cross(bounds, p, self.1));
+                geometries.push(mark_cross(bounds, p, self.state.0));
             }
         }
         geometries
@@ -77,32 +96,18 @@ impl Program<Message> for FigureProgram {
     }
 }
 
-impl UdpReceiver {
-    pub const fn new(port: u16) -> Self {
-        Self(port)
-    }
-}
-
-impl<H, E> Recipe<H, E> for UdpReceiver
+impl<H, E> Recipe<H, E> for CacheComplete
 where
     H: std::hash::Hasher,
 {
-    type Output = Message;
+    type Output = (Rectangle, Vec<Geometry>);
 
     fn hash(&self, state: &mut H) {
         use std::hash::Hash;
         std::any::TypeId::of::<Self>().hash(state);
-        self.0.hash(state);
     }
 
     fn stream(self: Box<Self>, _input: BoxStream<'static, E>) -> BoxStream<'static, Self::Output> {
-        let socket =
-            Arc::new(task::block_on(UdpSocket::bind(format!("0.0.0.0:{}", self.0))).unwrap());
-        let mut buf = [0u8; 65536];
-        Box::pin(repeat_with(move || {
-            let socket = socket.clone();
-            let (len, _) = task::block_on(socket.recv_from(&mut buf)).unwrap();
-            Message::MessageReceived(Instant::now(), buf[..len].to_vec())
-        }))
+        Box::pin(repeat_with(move || task::block_on(self.0.recv()).unwrap()))
     }
 }

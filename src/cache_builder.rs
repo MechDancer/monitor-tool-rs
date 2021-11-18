@@ -1,10 +1,9 @@
-﻿use async_std::{
+﻿use crate::{decode, Figure, FigureEvent};
+use async_std::{
     channel::{unbounded, Receiver, RecvError, TryRecvError},
     task::{self, JoinHandle},
 };
 use iced::{canvas::Geometry, Point, Rectangle};
-
-use crate::{Figure, FigureEvent};
 
 pub fn spawn_background(input: Receiver<FigureEvent>) -> Receiver<(Rectangle, Vec<Geometry>)> {
     let (sender, output) = unbounded();
@@ -16,7 +15,7 @@ pub fn spawn_background(input: Receiver<FigureEvent>) -> Receiver<(Rectangle, Ve
                     let figure = cache.take().unwrap();
                     cache = Some(handle(figure, event).await);
                 }
-                Err(RecvError) => panic!("Impossible!"),
+                Err(RecvError) => return,
             }
             loop {
                 use TryRecvError::*;
@@ -26,7 +25,7 @@ pub fn spawn_background(input: Receiver<FigureEvent>) -> Receiver<(Rectangle, Ve
                         cache = Some(handle(figure, event).await);
                     }
                     Err(Empty) => break,
-                    Err(Closed) => panic!("Impossible!"),
+                    Err(Closed) => return,
                 }
             }
             let _ = sender.send(cache.as_mut().unwrap().draw()).await;
@@ -39,8 +38,9 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
     task::spawn_blocking(move || {
         use FigureEvent::*;
         match event {
-            Zoom(pos, bounds, level) => figure.zoom(level, pos, bounds.size()),
+            Zoom(pos, bounds, level) => figure.zoom(level, pos, bounds),
             Resize(bounds) => figure.zoom(0.0, Point::ORIGIN, bounds),
+            Packet(time, buf) => decode(figure.as_mut(), time, buf.as_slice()),
         }
         figure
     })

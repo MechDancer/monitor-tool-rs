@@ -79,6 +79,7 @@ impl Figure {
             if scale_x == 0.0 || scale_y == 0.0 {
                 self.auto_view = true;
             } else {
+                self.auto_view = false;
                 self.view.scale = f32::min(scale_x, scale_y);
             }
         }
@@ -88,20 +89,17 @@ impl Figure {
     }
 
     /// 放缩
-    pub fn zoom(&mut self, level: f32, pos: Point, bounds: Size) {
+    pub fn zoom(&mut self, level: f32, pos: Point, bounds: Rectangle) {
+        self.auto_view = false;
         // 计算尺度
         if level.is_normal() {
             let k = (1.0 + level.signum() * 0.1).powf(level.abs());
             self.view.scale *= k;
             // 计算中心偏移
-            let c = Point {
-                x: bounds.width * 0.5,
-                y: bounds.height * 0.5,
-            };
-            let Vector { x, y } = (pos - c) * ((k - 1.0) / self.view.scale);
+            let Vector { x, y } = (pos - bounds.center()) * ((k - 1.0) / self.view.scale);
             self.view.center = self.view.center + Vector { x, y: -y };
         }
-        self.view.size = bounds;
+        self.view.size = bounds.size();
         self.redraw();
     }
 

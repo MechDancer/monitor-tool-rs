@@ -8,11 +8,13 @@ mod sender {}
 
 #[cfg(feature = "app")]
 mod app {
+    use std::cell::Cell;
+
     use async_std::channel::{unbounded, Receiver};
     use iced::{
         canvas::Geometry, executor, Application, Canvas, Command, Rectangle, Settings, Subscription,
     };
-    use monitor_tool::{spawn_background, FigureProgram, Message};
+    use monitor_tool::{spawn_draw, spawn_receive, CacheComplete, FigureProgram};
 
     pub fn run() {
         let _ = Main::run(Settings {
@@ -34,23 +36,24 @@ mod app {
     struct Main {
         title: String,
         port: u16,
-        redraw: Receiver<(Rectangle, Vec<Geometry>)>,
+        redraw: Cell<Option<Receiver<(Rectangle, Vec<Geometry>)>>>,
         canvas: FigureProgram,
     }
 
     impl Application for Main {
         type Executor = executor::Default;
-        type Message = Message;
+        type Message = (Rectangle, Vec<Geometry>);
         type Flags = Flags;
 
         fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
             let (sender, receiver) = unbounded();
+            spawn_receive(flags.port, sender.clone());
             (
                 Main {
                     title: flags.title,
                     port: flags.port,
-                    redraw: spawn_background(receiver),
-                    canvas: FigureProgram(sender, Default::default(), vec![]),
+                    redraw: Cell::new(Some(spawn_draw(receiver))),
+                    canvas: FigureProgram::new(sender),
                 },
                 Command::none(),
             )
@@ -61,8 +64,11 @@ mod app {
         }
 
         fn subscription(&self) -> Subscription<Self::Message> {
-            // Subscription::from_recipe(UdpReceiver::new(self.port))
-            Subscription::none()
+            if let Some(r) = self.redraw.replace(None) {
+                Subscription::from_recipe(CacheComplete(r))
+            } else {
+                Subscription::none()
+            }
         }
 
         fn update(
@@ -70,6 +76,7 @@ mod app {
             message: Self::Message,
             _clipboard: &mut iced::Clipboard,
         ) -> Command<Self::Message> {
+            self.canvas.state = message;
             Command::none()
         }
 
