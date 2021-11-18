@@ -8,8 +8,11 @@ mod sender {}
 
 #[cfg(feature = "app")]
 mod app {
-    use iced::{executor, Application, Canvas, Command, Settings, Subscription};
-    use monitor_tool::{FigureProgram, Message, UdpReceiver};
+    use async_std::channel::{unbounded, Receiver};
+    use iced::{
+        canvas::Geometry, executor, Application, Canvas, Command, Rectangle, Settings, Subscription,
+    };
+    use monitor_tool::{spawn_background, FigureProgram, Message};
 
     pub fn run() {
         let _ = Main::run(Settings {
@@ -31,6 +34,7 @@ mod app {
     struct Main {
         title: String,
         port: u16,
+        redraw: Receiver<(Rectangle, Vec<Geometry>)>,
         canvas: FigureProgram,
     }
 
@@ -40,11 +44,13 @@ mod app {
         type Flags = Flags;
 
         fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
+            let (sender, receiver) = unbounded();
             (
                 Main {
                     title: flags.title,
                     port: flags.port,
-                    canvas: FigureProgram::new(),
+                    redraw: spawn_background(receiver),
+                    canvas: FigureProgram(sender, Default::default(), vec![]),
                 },
                 Command::none(),
             )
@@ -55,7 +61,8 @@ mod app {
         }
 
         fn subscription(&self) -> Subscription<Self::Message> {
-            Subscription::from_recipe(UdpReceiver::new(self.port))
+            // Subscription::from_recipe(UdpReceiver::new(self.port))
+            Subscription::none()
         }
 
         fn update(
@@ -63,12 +70,6 @@ mod app {
             message: Self::Message,
             _clipboard: &mut iced::Clipboard,
         ) -> Command<Self::Message> {
-            match message {
-                Message::MessageReceived(time, buf) => {
-                    self.canvas.receive(time, buf.as_slice());
-                }
-                Message::ViewUpdated => println!("View Updated!"),
-            };
             Command::none()
         }
 

@@ -1,13 +1,8 @@
-﻿use crate::decode;
-use async_std::{
-    net::UdpSocket,
-    sync::{Arc, Mutex},
-    task,
-};
+﻿use async_std::{channel::Sender, net::UdpSocket, sync::Arc, task};
 use iced::{
     canvas::{event, Cursor, Event, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    mouse, Rectangle,
+    mouse, Point, Rectangle, Size,
 };
 use iced_futures::subscription::Recipe;
 use std::time::Instant;
@@ -18,7 +13,7 @@ pub(crate) use figure::Figure;
 use figure::{is_available, mark_cross};
 
 #[derive(Clone)]
-pub struct FigureProgram(Arc<Mutex<Figure>>);
+pub struct FigureProgram(pub Sender<FigureEvent>, pub Rectangle, pub Vec<Geometry>);
 
 pub struct UdpReceiver(u16);
 
@@ -28,16 +23,9 @@ pub enum Message {
     ViewUpdated,
 }
 
-impl FigureProgram {
-    #[inline]
-    pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(Figure::new())))
-    }
-
-    #[inline]
-    pub fn receive(&self, time: Instant, buf: &[u8]) {
-        decode(&mut task::block_on(self.0.lock()), time, buf);
-    }
+pub enum FigureEvent {
+    Zoom(Point, Rectangle, f32),
+    Resize(Size),
 }
 
 impl Program<Message> for FigureProgram {
@@ -52,7 +40,6 @@ impl Program<Message> for FigureProgram {
         } else {
             return (event::Status::Ignored, None);
         };
-        let bounds = bounds.size();
 
         use mouse::{Event::*, ScrollDelta};
         match event {
@@ -60,24 +47,21 @@ impl Program<Message> for FigureProgram {
                 WheelScrolled {
                     delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
                 } => {
-                    task::block_on(async {
-                        let figure = &mut self.0.lock().await;
-                        figure.auto_view = false;
-                        figure.zoom(y, pos, bounds);
-                    });
-                    (event::Status::Captured, Some(Message::ViewUpdated))
+                    let _ = task::block_on(self.0.send(FigureEvent::Zoom(pos, bounds, y)));
                 }
-                _ => (event::Status::Ignored, None),
+                _ => {}
             },
-            _ => (event::Status::Ignored, None),
+            _ => {}
         }
+        (event::Status::Ignored, None)
     }
 
     fn draw(&self, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry> {
-        let (rectangle, mut geometries) = task::block_on(self.0.lock()).draw(bounds.size());
+        let _ = task::block_on(self.0.send(FigureEvent::Resize(bounds.size())));
+        let mut geometries = self.2.clone();
         if let Cursor::Available(p) = cursor {
             if is_available(bounds, p) {
-                geometries.push(mark_cross(bounds, p, rectangle));
+                geometries.push(mark_cross(bounds, p, self.1));
             }
         }
         geometries

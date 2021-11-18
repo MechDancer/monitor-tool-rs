@@ -9,6 +9,10 @@ mod protocol;
 #[cfg(feature = "sender")]
 pub use protocol::*;
 
+mod cache_builder;
+
+pub use cache_builder::spawn_background;
+
 /// 图形顶点
 #[derive(Clone, Copy, Default)]
 #[repr(C)]
