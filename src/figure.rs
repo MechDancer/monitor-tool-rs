@@ -90,7 +90,7 @@ impl Figure {
         let geometries = self
             .topics
             .values_mut()
-            .filter(|content| self.visible_layers.contains(&content.layer))
+            .filter(|content| check_visible(&self.visible_layers, &content.layer))
             .filter_map(|content| {
                 content.set_config(self.view);
                 content.draw()
@@ -121,6 +121,7 @@ impl Figure {
         }
     }
 
+    /// 重新关联同步组
     pub fn update_sync_set(&mut self, sync_set: &String, title: TopicTitle) {
         let set = &mut self.sync_sets.get_mut(sync_set).unwrap().0;
         if sync_set.is_empty() {
@@ -161,10 +162,15 @@ impl Figure {
     fn aabb(&mut self) -> Option<AABB> {
         self.topics
             .values_mut()
-            .filter(|content| self.visible_layers.contains(&content.layer))
+            .filter(|content| check_visible(&self.visible_layers, &content.layer))
             .filter_map(|content| content.aabb())
             .reduce(|sum, it| sum + it)
     }
+}
+
+#[inline]
+fn check_visible(set: &HashSet<String>, layer: &String) -> bool {
+    layer.is_empty() || set.contains(layer)
 }
 
 impl Default for View {

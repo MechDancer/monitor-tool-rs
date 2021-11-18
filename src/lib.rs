@@ -156,7 +156,7 @@ where
     fn stream(self: Box<Self>, _input: BoxStream<'static, E>) -> BoxStream<'static, Self::Output> {
         let socket =
             Arc::new(task::block_on(UdpSocket::bind(format!("0.0.0.0:{}", self.0))).unwrap());
-        let mut buf = [0u8; 1500];
+        let mut buf = [0u8; 65536];
         Box::pin(repeat_with(move || {
             let socket = socket.clone();
             let (len, add) = task::block_on(socket.recv_from(&mut buf)).unwrap();

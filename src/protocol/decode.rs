@@ -14,20 +14,23 @@ mod sync_sets_and_layers;
 use sync_sets_and_layers::*;
 
 macro_rules! read {
-    ($buf:expr => $ty:ty) => {
-        if $buf.len() >= std::mem::size_of::<$ty>() {
+    ($buf:expr => $ty:ty) => {{
+        const LEN: usize = std::mem::size_of::<$ty>();
+        if $buf.len() >= LEN {
             let ptr = $buf.as_ptr() as *const $ty;
-            $buf = &$buf[std::mem::size_of::<$ty>()..];
+            $buf = &$buf[LEN..];
             Some(unsafe { &*ptr })
         } else {
             None
         }
-    };
+    }};
     ($buf:expr => $ty:ty; $n:expr) => {{
+        const LEN: usize = std::mem::size_of::<$ty>();
         let n = $n as usize;
-        if $buf.len() >= n * std::mem::size_of::<$ty>() {
+        let len = n * LEN;
+        if $buf.len() >= len {
             let slice = unsafe { std::slice::from_raw_parts($buf.as_ptr() as *const $ty, n) };
-            $buf = &$buf[std::mem::size_of::<$ty>()..];
+            $buf = &$buf[len..];
             Some(slice)
         } else {
             None
@@ -75,6 +78,7 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut bu
             Visible::Invisible => figure.set_visible(layer, false),
         }
     }
+    println!("buf.len = {}", buf.len());
     // 解析话题
     loop {
         // 构造话题标题
@@ -92,6 +96,7 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut bu
                 source: src,
             }
         };
+        println!("title: {}", title);
         // 更新同步组
         match read!(buf => u16) {
             Some(0) => {}

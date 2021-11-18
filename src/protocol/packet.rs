@@ -64,7 +64,7 @@ impl Encoder {
             .sync_sets
             .entry(set.to_string())
             .or_insert_with(|| WithIndex {
-                index: next,
+                index: next + 1,
                 value: Default::default(),
             });
         if let Some(life_time) = life_time {
@@ -87,7 +87,7 @@ impl Encoder {
             .layers
             .entry(layer.to_string())
             .or_insert_with(|| WithIndex {
-                index: next,
+                index: next + 1,
                 value: Default::default(),
             });
         body.value = visible.into();
@@ -144,40 +144,41 @@ impl Encoder {
 
     /// 编码
     pub fn encode(self) -> Vec<u8> {
-        let mut result = Vec::new();
+        let mut buf = Vec::new();
         // 编码摄像机配置
-        extend!(self.camera => result);
+        extend!(self.camera => buf);
         // 编码同步组
-        sort_and_encode(&self.sync_sets, &mut result);
+        sort_and_encode(&self.sync_sets, &mut buf);
         // 编码图层
-        sort_and_encode(&self.layers, &mut result);
+        sort_and_encode(&self.layers, &mut buf);
         // 编码话题
         for (name, body) in self.topics {
-            extend!(len; name.len()    => result);
-            extend!(str; name          => result);
-            extend!(     body.sync_set => result);
-            extend!(     body.layer    => result);
-            extend!(     body.clear    => result);
-            extend!(     body.capacity => result);
-            extend!(     body.focus    => result);
+            extend!(len; name.len()    => buf);
+            extend!(str; name          => buf);
+            extend!(     body.sync_set => buf);
+            extend!(     body.layer    => buf);
+            extend!(     body.clear    => buf);
+            extend!(     body.capacity => buf);
+            extend!(     body.focus    => buf);
             // 编码颜色
-            extend!(len; body.colors.len() => result);
+            extend!(len; body.colors.len() => buf);
             for (level, rgba) in body.colors {
-                extend!(level => result);
-                extend!(rgba  => result);
+                extend!(level => buf);
+                extend!(rgba  => buf);
             }
             // 编码顶点
-            extend!(len; body.vertex.len() => result);
+            extend!(len; body.vertex.len() => buf);
             for v in body.vertex {
-                extend!(v => result);
+                extend!(v => buf);
             }
         }
-        result
+        println!("{}", buf.len());
+        buf
     }
 }
 
 /// 从已排序的集合编码
-fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, result: &mut Vec<u8>) {
+fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Vec<u8>) {
     // 用 u16 保存长度
     const USIZE_LEN: usize = std::mem::size_of::<u16>();
     // 依序号排序
@@ -186,19 +187,44 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, result: &mut
         sorted[body.index as usize] = Some((name.as_str(), &body.value));
     }
     // 编码：| 数量 n | 每个尾部位置 × n | 逐个编码 |
-    extend!(len; sorted.len() => result);
-    let mut ptr_len = result.len();
-    let ptr_content = ptr_len + USIZE_LEN * result.len();
-    result.resize(ptr_content, 0);
+    extend!(len; sorted.len() => buf);
+    let mut ptr_len = buf.len();
+    let ptr_content = ptr_len + USIZE_LEN * map.len();
+    buf.resize(ptr_content, 0);
     sorted
         .into_iter()
         .map(|o| o.unwrap())
         .for_each(|(name, body)| {
-            extend!(     *body => result);
-            extend!(str;  name => result);
+            extend!(     *body => buf);
+            extend!(str;  name => buf);
             unsafe {
-                *(result[ptr_len..].as_ptr() as *mut _) = (result.len() - ptr_content) as u16;
+                *(buf[ptr_len..].as_ptr() as *mut _) = (buf.len() - ptr_content) as u16;
             }
             ptr_len += USIZE_LEN;
         });
+}
+
+#[test]
+fn send() {
+    use async_std::{net::UdpSocket, task};
+
+    let mut encoder = Encoder::default();
+    encoder.topic_clear("test");
+    for i in 0..100 {
+        let x = (i as f32) * 0.1 + 20.0;
+        encoder.topic_push(
+            "test",
+            Vertex {
+                x,
+                y: x.sin(),
+                dir: f32::NAN,
+                level: 0,
+                tie: true,
+                _zero: 0,
+            },
+        )
+    }
+    let buf = encoder.encode();
+    let socket = task::block_on(UdpSocket::bind("0.0.0.0:0")).unwrap();
+    let _ = task::block_on(socket.send_to(&buf, "127.0.0.1:12345"));
 }
