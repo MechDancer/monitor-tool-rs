@@ -90,15 +90,19 @@ impl Program<Message> for FigureProgram {
 
         use mouse::{Event::*, ScrollDelta};
         match event {
-            event::Event::Mouse(mouse_event) => {
-                match mouse_event {
-                    WheelScrolled {
-                        delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
-                    } => task::block_on(self.0.lock()).figure.zoom(y, pos, bounds),
-                    _ => {}
+            event::Event::Mouse(mouse_event) => match mouse_event {
+                WheelScrolled {
+                    delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
+                } => {
+                    task::block_on(async {
+                        let figure = &mut self.0.lock().await.figure;
+                        figure.auto_view = false;
+                        figure.zoom(y, pos, bounds);
+                    });
+                    (event::Status::Captured, Some(Message::ViewUpdated))
                 }
-                (event::Status::Captured, Some(Message::ViewUpdated))
-            }
+                _ => (event::Status::Ignored, None),
+            },
             _ => (event::Status::Ignored, None),
         }
     }

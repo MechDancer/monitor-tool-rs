@@ -146,26 +146,15 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
     }
 }
 
+#[inline]
 fn update_camera(figure: &mut Figure, camera: &Camera) {
     let Camera {
         x,
         y,
         scale_x,
         scale_y,
-    } = camera;
-    if x.is_finite() {
-        figure.view.center.x = *x;
-    }
-    if y.is_finite() {
-        figure.view.center.y = *y;
-    }
-    if scale_x.is_finite() && scale_y.is_finite() {
-        if *scale_x == 0.0 || *scale_y == 0.0 {
-            figure.auto_view = true;
-        } else {
-            figure.view.scale = f32::min(*scale_x, *scale_y);
-        }
-    }
+    } = *camera;
+    figure.set_view(x, y, scale_x, scale_y);
 }
 
 #[inline]

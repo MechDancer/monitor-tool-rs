@@ -1,4 +1,5 @@
-﻿use iced::{canvas::Geometry, Point, Rectangle, Size, Vector};
+﻿use async_std::task;
+use iced::{canvas::Geometry, Point, Rectangle, Size, Vector};
 use std::{
     collections::{HashMap, HashSet},
     time::{Duration, Instant},
@@ -14,26 +15,54 @@ pub(crate) use content::TopicContent;
 #[derive(Default)]
 pub(crate) struct Figure {
     pub auto_view: bool,
-    pub view: View,
+    view: View,
 
-    topics: HashMap<String, TopicContent>,
+    topics: HashMap<String, Option<Box<TopicContent>>>,
     visible_layers: HashSet<String>,
     sync_sets: HashMap<String, (HashSet<String>, Duration)>,
 }
 
 /// 视野
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub(crate) struct View {
+pub(super) struct View {
     pub size: Size,
     pub center: Point,
     pub scale: f32,
 }
 
+macro_rules! unwrap {
+    (     $wrapped:expr) => {
+        $wrapped.as_ref().unwrap()
+    };
+    (mut; $wrapped:expr) => {
+        $wrapped.as_mut().unwrap()
+    };
+}
+
 impl Figure {
+    /// 设置视角
+    pub fn set_view(&mut self, x: f32, y: f32, scale_x: f32, scale_y: f32) {
+        let old = self.view;
+        if x.is_finite() {
+            self.view.center.x = x;
+        }
+        if y.is_finite() {
+            self.view.center.y = y;
+        }
+        if scale_x.is_finite() && scale_y.is_finite() {
+            if scale_x == 0.0 || scale_y == 0.0 {
+                self.auto_view = true;
+            } else {
+                self.view.scale = f32::min(scale_x, scale_y);
+            }
+        }
+        if old != self.view {
+            self.redraw();
+        }
+    }
+
     /// 放缩
     pub fn zoom(&mut self, level: f32, pos: Point, bounds: Size) {
-        // 关闭自动
-        self.auto_view = false;
         // 计算尺度
         let k = if level > 0.0 {
             1.1f32.powf(level)
@@ -48,8 +77,7 @@ impl Figure {
         };
         let Vector { x, y } = (pos - c) * ((k - 1.0) / self.view.scale);
         self.view.center = self.view.center + Vector { x, y: -y };
-        // 打日志
-        println!("scale = {}", self.view.scale);
+        self.redraw();
     }
 
     /// 画图
@@ -73,9 +101,7 @@ impl Figure {
                     self.view.scale = new;
                 }
                 if self.view != old {
-                    for content in self.topics.values_mut() {
-                        content.redraw();
-                    }
+                    self.redraw();
                 }
             }
         }
@@ -89,13 +115,21 @@ impl Figure {
             to_canvas(self.view.center + diagonal, self.view.center),
         ])
         .unwrap();
+        let view = self.view;
         // 写入配置并绘制
-        let geometries = self
+        let tasks = self
             .topics
-            .values_mut()
-            .filter(|content| check_visible(&self.visible_layers, &content.layer))
-            .filter_map(|content| content.draw(self.view, aabb))
-            .collect();
+            .iter_mut()
+            .filter(|(_, content)| check_visible(&self.visible_layers, content))
+            .map(|(topic, content)| {
+                let topic = topic.clone();
+                let mut content = content.take().unwrap();
+                task::spawn_blocking(move || {
+                    let geometry = content.draw(view, aabb);
+                    (topic, content, geometry)
+                })
+            })
+            .collect::<Vec<_>>();
         (
             Rectangle {
                 x: self.view.center.x - diagonal.x,
@@ -103,7 +137,14 @@ impl Figure {
                 width: diagonal.x * 2.0,
                 height: diagonal.y * 2.0,
             },
-            geometries,
+            tasks
+                .into_iter()
+                .map(|handle| task::block_on(handle))
+                .filter_map(|(name, content, geometry)| {
+                    *self.topics.get_mut(&name).unwrap() = Some(content);
+                    geometry
+                })
+                .collect(),
         )
     }
 
@@ -133,7 +174,9 @@ impl Figure {
 
     /// 获取话题对象
     pub fn topic_mut<'a>(&'a mut self, topic: String) -> &'a mut TopicContent {
-        self.topics.entry(topic).or_default()
+        unwrap!(mut; self.topics
+            .entry(topic)
+            .or_insert(Some(Default::default())))
     }
 
     /// 同步
@@ -142,7 +185,10 @@ impl Figure {
             // 按当前时间计算期限
             let deadline0 = now.checked_sub(*life_time);
             // 按数量消除并计算期限
-            let deadline1 = set.iter().filter_map(|t| self.topics[t].begin()).min();
+            let deadline1 = set
+                .iter()
+                .filter_map(|t| unwrap!(self.topics[t]).begin())
+                .min();
             // 合并期限
             if let Some(deadline) = match (deadline0, deadline1) {
                 (None, None) => None,
@@ -152,7 +198,7 @@ impl Figure {
             } {
                 // 按期限消除
                 for t in set.iter() {
-                    self.topics.get_mut(t).unwrap().sync(deadline)
+                    unwrap!(mut; self.topics.get_mut(t).unwrap()).sync(deadline)
                 }
             }
         }
@@ -162,14 +208,22 @@ impl Figure {
     fn aabb(&mut self) -> Option<AABB> {
         self.topics
             .values_mut()
-            .filter(|content| check_visible(&self.visible_layers, &content.layer))
-            .filter_map(|content| content.aabb())
+            .filter(|content| check_visible(&self.visible_layers, content))
+            .filter_map(|content| unwrap!(mut; content).aabb())
             .reduce(|sum, it| sum + it)
+    }
+
+    #[inline]
+    fn redraw(&mut self) {
+        for content in self.topics.values_mut() {
+            unwrap!(mut; content).redraw();
+        }
     }
 }
 
 #[inline]
-fn check_visible(set: &HashSet<String>, layer: &String) -> bool {
+fn check_visible(set: &HashSet<String>, content: &Option<Box<TopicContent>>) -> bool {
+    let layer = &unwrap!(content).layer;
     layer.is_empty() || set.contains(layer)
 }
 

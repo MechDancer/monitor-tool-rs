@@ -54,6 +54,7 @@ impl TopicCache {
     /// 画图
     pub fn draw(&mut self, items: Items, size: Size, scale: f32) -> Geometry {
         let items = items.collect::<Vec<_>>();
+        let mass = items.len() > 10000;
         self.cache.draw(size, |frame| {
             frame.translate(frame.center() - Point::ORIGIN);
             frame.scale(scale);
@@ -61,7 +62,9 @@ impl TopicCache {
             for item in items.iter().copied() {
                 match item {
                     FigureItem::Point(p, color) => {
-                        frame.fill(&Path::circle(p, radius), color);
+                        if !mass {
+                            frame.fill(&Path::circle(p, radius), color);
+                        }
                     }
                     FigureItem::Arrow(p, d, color) => {
                         let (sin, cos) = d.sin_cos();

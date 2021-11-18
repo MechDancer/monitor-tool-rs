@@ -212,6 +212,7 @@ fn send() {
             let mut encoder = Encoder::default();
             if i == 0 {
                 encoder.camera(Camera::AUTO);
+                encoder.topic_set_capacity("test", 100000);
                 encoder.topic_set_focus("test", 1000);
                 encoder.topic_clear("test");
             }
