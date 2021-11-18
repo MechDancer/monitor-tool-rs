@@ -183,7 +183,7 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Ve
     // 依序号排序
     let mut sorted = vec![None; map.len()];
     for (name, body) in map {
-        sorted[body.index as usize] = Some((name.as_str(), &body.value));
+        sorted[body.index as usize - 1] = Some((name.as_str(), &body.value));
     }
     // 编码：| 数量 n | 每个尾部位置 × n | 逐个编码 |
     extend!(len; sorted.len() => buf);
@@ -205,30 +205,43 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Ve
 
 #[test]
 fn send() {
-    use std::{net::UdpSocket, thread};
+    use palette::{Pixel, Srgba};
+    use rand::{thread_rng, Rng};
+    use std::net::UdpSocket;
+
+    let mut rng = thread_rng();
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
-    for i in 0.. {
+
+    {
         let mut encoder = Encoder::default();
-        if i == 0 {
-            encoder.camera(Camera::AUTO);
-            encoder.topic_set_capacity("test", 100000);
-            encoder.topic_set_focus("test", 1000);
-            encoder.topic_clear("test");
+        encoder.camera(Camera::AUTO);
+        encoder.topic_set_capacity("test", 20000);
+        encoder.topic_set_focus("test", 200);
+        encoder.topic_clear("test");
+        encoder.sync_set("test", &["test"], Some(Duration::from_secs(1)));
+        for i in 0..255 {
+            let color: [u8; 4] = rng.gen::<Srgba>().into_format().into_raw();
+            encoder.topic_set_color("test", i, RGBA(color[0], color[1], color[2], color[3]))
         }
-        for j in 0..100 {
-            let x = (100 * i + j) as f32 * 0.1;
-            encoder.topic_push(
-                "test",
-                Vertex {
-                    x,
-                    y: 2.0 * x.sin(),
-                    dir: f32::NAN,
-                    level: 0,
-                    tie: true,
-                    _zero: 0,
-                },
-            );
-        }
+        let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
+    }
+
+    for i in 0 as u64.. {
+        use std::{f32::consts::PI, thread};
+        let mut encoder = Encoder::default();
+        let theta = (i as f32).powf(1.1) * PI * 1e-2;
+        let (sin, cos) = theta.sin_cos();
+        encoder.topic_push(
+            "test",
+            Vertex {
+                x: 0.1 * theta * cos,
+                y: 0.1 * theta * sin,
+                dir: f32::NAN,
+                level: (i / 50) as u8,
+                tie: true,
+                _zero: 0,
+            },
+        );
         let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
         thread::sleep(Duration::from_millis(20));
     }

@@ -238,7 +238,7 @@ impl Figure {
                 (None, None) => None,
                 (Some(t), None) => Some(t),
                 (None, Some(t)) => Some(t),
-                (Some(t0), Some(t1)) => Some(std::cmp::min(t0, t1)),
+                (Some(t0), Some(t1)) => Some(std::cmp::max(t0, t1)),
             } {
                 // 按期限消除
                 for t in set.iter() {
