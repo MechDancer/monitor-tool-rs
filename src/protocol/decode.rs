@@ -1,13 +1,6 @@
-﻿use crate::{
-    figure::{Figure, TopicTitle},
-    protocol::Visible,
-    Camera, Vertex, RGBA,
-};
+﻿use crate::{figure::Figure, protocol::Visible, Camera, Vertex, RGBA};
 use iced::Color;
-use std::{
-    net::SocketAddr,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 mod sync_sets_and_layers;
 
@@ -54,7 +47,7 @@ macro_rules! read_by_tails {
     };
 }
 
-pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut buf: &[u8]) {
+pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
     // 解析摄像机
     match read!(buf => Camera) {
         Some(camera) => update_camera(figure, camera),
@@ -78,7 +71,6 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut bu
             Visible::Invisible => figure.set_visible(layer, false),
         }
     }
-    println!("buf.len = {}", buf.len());
     // 解析话题
     loop {
         // 构造话题标题
@@ -87,27 +79,22 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, src: SocketAddr, mut bu
                 Some(len) => *len as usize,
                 None => return,
             };
-            let title = match read!(buf => u8; len) {
+            match read!(buf => u8; len) {
                 Some(slice) => unsafe { std::str::from_utf8_unchecked(slice) },
                 None => return,
-            };
-            TopicTitle {
-                title: title.to_string(),
-                source: src,
             }
         };
-        println!("title: {}", title);
         // 更新同步组
         match read!(buf => u16) {
             Some(0) => {}
             Some(i) => {
                 let (sync_set, _) = sync_sets.get(*i as usize - 1);
-                figure.update_sync_set(&sync_set.to_string(), title.clone());
+                figure.update_sync_set(&sync_set.to_string(), title.to_string());
             }
             None => return,
         }
         // 更新话题内容
-        let topic = figure.topic_mut(title);
+        let topic = figure.topic_mut(title.to_string());
         // 更新图层
         match read!(buf => u16) {
             Some(0) => {}

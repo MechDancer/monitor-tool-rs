@@ -172,7 +172,6 @@ impl Encoder {
                 extend!(v => buf);
             }
         }
-        println!("{}", buf.len());
         buf
     }
 }
@@ -207,24 +206,30 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Ve
 #[test]
 fn send() {
     use async_std::{net::UdpSocket, task};
-
-    let mut encoder = Encoder::default();
-    encoder.topic_clear("test");
-    for i in 0..100 {
-        let x = (i as f32) * 0.1 + 20.0;
-        encoder.topic_push(
-            "test",
-            Vertex {
-                x,
-                y: x.sin(),
-                dir: f32::NAN,
-                level: 0,
-                tie: true,
-                _zero: 0,
-            },
-        )
-    }
-    let buf = encoder.encode();
-    let socket = task::block_on(UdpSocket::bind("0.0.0.0:0")).unwrap();
-    let _ = task::block_on(socket.send_to(&buf, "127.0.0.1:12345"));
+    task::block_on(async {
+        let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
+        for i in 0.. {
+            let mut encoder = Encoder::default();
+            if i == 0 {
+                encoder.camera(Camera::AUTO);
+                encoder.topic_clear("test");
+            }
+            for j in 0..100 {
+                let x = (100 * i + j) as f32 * 0.1;
+                encoder.topic_push(
+                    "test",
+                    Vertex {
+                        x,
+                        y: 2.0 * x.sin(),
+                        dir: f32::NAN,
+                        level: 0,
+                        tie: true,
+                        _zero: 0,
+                    },
+                );
+            }
+            let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345").await;
+            task::sleep(Duration::from_millis(20)).await;
+        }
+    });
 }

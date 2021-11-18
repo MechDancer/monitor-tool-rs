@@ -1,8 +1,6 @@
 ﻿use iced::{canvas::Geometry, Point, Rectangle, Size, Vector};
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Display,
-    net::SocketAddr,
     time::{Duration, Instant},
 };
 
@@ -18,9 +16,9 @@ pub(crate) struct Figure {
     pub auto_view: bool,
     pub view: View,
 
-    topics: HashMap<TopicTitle, TopicContent>,
+    topics: HashMap<String, TopicContent>,
     visible_layers: HashSet<String>,
-    sync_sets: HashMap<String, (HashSet<TopicTitle>, Duration)>,
+    sync_sets: HashMap<String, (HashSet<String>, Duration)>,
 }
 
 /// 视野
@@ -29,13 +27,6 @@ pub(crate) struct View {
     pub size: Size,
     pub center: Point,
     pub scale: f32,
-}
-
-/// 话题标题，用于区分话题
-#[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct TopicTitle {
-    pub title: String,
-    pub source: SocketAddr,
 }
 
 impl Figure {
@@ -122,18 +113,18 @@ impl Figure {
     }
 
     /// 重新关联同步组
-    pub fn update_sync_set(&mut self, sync_set: &String, title: TopicTitle) {
+    pub fn update_sync_set(&mut self, sync_set: &String, topic: String) {
         let set = &mut self.sync_sets.get_mut(sync_set).unwrap().0;
         if sync_set.is_empty() {
-            set.remove(&title);
+            set.remove(&topic);
         } else {
-            set.insert(title);
+            set.insert(topic);
         }
     }
 
     /// 获取话题对象
-    pub fn topic_mut<'a>(&'a mut self, title: TopicTitle) -> &'a mut TopicContent {
-        self.topics.entry(title).or_default()
+    pub fn topic_mut<'a>(&'a mut self, topic: String) -> &'a mut TopicContent {
+        self.topics.entry(topic).or_default()
     }
 
     /// 同步
@@ -188,10 +179,4 @@ impl View {
         center: Point::ORIGIN,
         scale: 1.0,
     };
-}
-
-impl Display for TopicTitle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", self.title, self.source)
-    }
 }

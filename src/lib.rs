@@ -1,5 +1,5 @@
 ﻿use async_std::{
-    net::{SocketAddr, UdpSocket},
+    net::UdpSocket,
     sync::{Arc, Mutex},
     task,
 };
@@ -38,7 +38,7 @@ pub struct UdpReceiver(u16);
 
 #[derive(Debug)]
 pub enum Message {
-    MessageReceived(Instant, SocketAddr, Vec<u8>),
+    MessageReceived(Instant, Vec<u8>),
     ViewUpdated,
 }
 
@@ -59,8 +59,8 @@ impl FigureProgram {
     }
 
     #[inline]
-    pub fn receive(&self, time: Instant, src: SocketAddr, buf: &[u8]) {
-        decode(&mut task::block_on(self.0.lock()).figure, time, src, buf);
+    pub fn receive(&self, time: Instant, buf: &[u8]) {
+        decode(&mut task::block_on(self.0.lock()).figure, time, buf);
     }
 }
 
@@ -159,22 +159,8 @@ where
         let mut buf = [0u8; 65536];
         Box::pin(repeat_with(move || {
             let socket = socket.clone();
-            let (len, add) = task::block_on(socket.recv_from(&mut buf)).unwrap();
-            Message::MessageReceived(Instant::now(), add, buf[..len].to_vec())
+            let (len, _) = task::block_on(socket.recv_from(&mut buf)).unwrap();
+            Message::MessageReceived(Instant::now(), buf[..len].to_vec())
         }))
     }
-}
-
-#[test]
-fn send() {
-    use std::net::{Ipv4Addr, SocketAddrV4};
-    task::block_on(async {
-        let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
-        let _ = socket
-            .send_to(
-                &[1, 2, 3, 4, 5, 6, 7, 8, 9],
-                SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 12345)),
-            )
-            .await;
-    });
 }
