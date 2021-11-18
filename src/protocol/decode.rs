@@ -153,13 +153,13 @@ fn update_camera(figure: &mut Figure, camera: &Camera) {
         scale_x,
         scale_y,
     } = camera;
-    if x.is_normal() {
+    if x.is_finite() {
         figure.view.center.x = *x;
     }
-    if y.is_normal() {
+    if y.is_finite() {
         figure.view.center.y = *y;
     }
-    if scale_x.is_normal() && scale_y.is_normal() {
+    if scale_x.is_finite() && scale_y.is_finite() {
         if *scale_x == 0.0 || *scale_y == 0.0 {
             figure.auto_view = true;
         } else {
