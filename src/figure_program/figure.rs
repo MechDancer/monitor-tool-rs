@@ -22,8 +22,9 @@ use self::border::available_size;
 /// 画面
 pub(crate) struct Figure {
     update_time: Instant,
+    print_time: bool,
 
-    pub auto_view: bool,
+    auto_view: bool,
     view: View,
 
     topics: HashMap<String, Option<Box<TopicContent>>>,
@@ -54,6 +55,7 @@ impl Figure {
     pub fn new() -> Self {
         Self {
             update_time: Instant::now(),
+            print_time: true,
 
             auto_view: false,
             view: View::DEFAULT,
@@ -206,10 +208,19 @@ impl Figure {
     }
 
     /// 获取话题对象
-    pub fn topic_mut<'a>(&'a mut self, topic: String) -> &'a mut TopicContent {
+    pub fn put_topic<'a>(&'a mut self, topic: impl ToString) -> &'a mut TopicContent {
         unwrap!(mut; self.topics
-            .entry(topic)
+            .entry(topic.to_string())
             .or_insert(Some(Default::default())))
+    }
+
+    /// 获取话题对象
+    pub fn get_topic<'a>(&'a mut self, topic: &String) -> Option<&'a mut Box<TopicContent>> {
+        self.topics.get_mut(topic).map(|c| unwrap!(mut; c))
+    }
+
+    pub fn set_print_time(&mut self, value: bool) {
+        self.print_time = value;
     }
 
     /// 同步
@@ -253,14 +264,17 @@ impl Figure {
         }
     }
 
+    /// 计时
     #[inline]
     fn timer(&mut self, time: Instant) {
-        // 计时
-        println!(
-            "period = {:?}, delay = {:?}",
-            time - std::mem::replace(&mut self.update_time, time),
-            Instant::now() - time,
-        );
+        let last = std::mem::replace(&mut self.update_time, time);
+        if self.print_time {
+            println!(
+                "period = {:?}, delay = {:?}",
+                time - last,
+                Instant::now() - time,
+            );
+        }
     }
 }
 

@@ -41,6 +41,23 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
             Zoom(pos, bounds, level) => figure.zoom(level, pos, bounds),
             Resize(bounds) => figure.zoom(0.0, Point::ORIGIN, bounds),
             Packet(time, buf) => decode(figure.as_mut(), time, buf.as_slice()),
+            Line(line) => {
+                let words = line.split_whitespace().collect::<Vec<_>>();
+                match words.as_slice() {
+                    ["auto"] => figure.set_view(f32::NAN, f32::NAN, 0.0, 0.0),
+                    ["log", "time"] => figure.set_print_time(true),
+                    ["unlog", "time"] => figure.set_print_time(false),
+                    [title, "focus", num] => {
+                        if let Ok(n) = num.parse() {
+                            if let Some(topic) = figure.get_topic(&title.to_string()) {
+                                topic.set_focus(n);
+                                println!("set focus {} for {}", n, title);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
         figure
     })

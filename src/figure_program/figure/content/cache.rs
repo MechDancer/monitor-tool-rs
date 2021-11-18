@@ -11,6 +11,7 @@ pub(super) struct TopicCache {
     cache: Cache,
 }
 
+#[derive(Debug)]
 enum Bound {
     Cached(AABB),
     CachedVoid,

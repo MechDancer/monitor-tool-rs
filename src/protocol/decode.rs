@@ -95,7 +95,7 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
             None => return,
         }
         // 更新话题内容
-        let topic = figure.topic_mut(title.to_string());
+        let topic = figure.put_topic(title.to_string());
         // 更新图层
         match read!(buf => u16) {
             Some(0) => {}

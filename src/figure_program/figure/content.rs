@@ -84,8 +84,7 @@ impl TopicContent {
     /// 计算关注范围
     #[inline]
     pub fn aabb(&mut self) -> Option<AABB> {
-        self.cache
-            .aabb(self.queue.iter().map(|(_, v)| Point { x: v.x, y: v.y }))
+        self.cache.aabb(self.queue.iter().map(|(_, v)| v.pos()))
     }
 
     /// 画图

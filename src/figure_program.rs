@@ -31,6 +31,7 @@ pub enum FigureEvent {
     Zoom(Point, Rectangle, f32),
     Resize(Rectangle),
     Packet(Instant, Vec<u8>),
+    Line(String),
 }
 
 impl FigureProgram {

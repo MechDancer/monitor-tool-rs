@@ -35,9 +35,8 @@ mod app {
 
     struct Main {
         title: String,
-        port: u16,
-        redraw: Cell<Option<Receiver<(Rectangle, Vec<Geometry>)>>>,
-        canvas: FigureProgram,
+        painter: Cell<Option<Receiver<(Rectangle, Vec<Geometry>)>>>,
+        program: FigureProgram,
     }
 
     impl Application for Main {
@@ -50,21 +49,20 @@ mod app {
             spawn_receive(flags.port, sender.clone());
             (
                 Main {
-                    title: flags.title,
-                    port: flags.port,
-                    redraw: Cell::new(Some(spawn_draw(receiver))),
-                    canvas: FigureProgram::new(sender),
+                    title: format!("{}: {}", flags.title, flags.port),
+                    painter: Cell::new(Some(spawn_draw(receiver))),
+                    program: FigureProgram::new(sender),
                 },
                 Command::none(),
             )
         }
 
         fn title(&self) -> String {
-            format!("{}: {}", self.title, self.port)
+            self.title.clone()
         }
 
         fn subscription(&self) -> Subscription<Self::Message> {
-            if let Some(r) = self.redraw.replace(None) {
+            if let Some(r) = self.painter.replace(None) {
                 Subscription::from_recipe(CacheComplete(r))
             } else {
                 Subscription::none()
@@ -76,13 +74,13 @@ mod app {
             message: Self::Message,
             _clipboard: &mut iced::Clipboard,
         ) -> Command<Self::Message> {
-            self.canvas.state = message;
+            self.program.state = message;
             Command::none()
         }
 
         fn view(&mut self) -> iced::Element<'_, Self::Message> {
             use iced::Length::Fill;
-            Canvas::new(self.canvas.clone())
+            Canvas::new(self.program.clone())
                 .width(Fill)
                 .height(Fill)
                 .into()
