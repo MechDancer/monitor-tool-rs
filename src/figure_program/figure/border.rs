@@ -1,4 +1,4 @@
-﻿use iced::{canvas::*, Color, Point, Rectangle, Size};
+﻿use iced::{canvas::*, Color, Point, Rectangle, Size, Vector};
 
 const BORDER_OFFSET: Point = Point { x: 64.0, y: 32.0 };
 
@@ -30,19 +30,22 @@ pub(super) fn border(frame: &mut Frame, color: Color) {
 }
 
 #[inline]
-pub(crate) fn is_available(size: Size, p: Point) -> bool {
-    Rectangle {
-        x: BORDER_OFFSET.x,
-        y: BORDER_OFFSET.y,
-        width: size.width - 2.0 * BORDER_OFFSET.x,
-        height: size.height - 2.0 * BORDER_OFFSET.y,
-    }
-    .contains(p)
+pub(crate) fn is_available(mut bounds: Rectangle, p: Point) -> bool {
+    bounds.x += BORDER_OFFSET.x;
+    bounds.y += BORDER_OFFSET.y;
+    bounds.width -= BORDER_OFFSET.x * 2.0;
+    bounds.height -= BORDER_OFFSET.y * 2.0;
+    bounds.contains(p)
 }
 
-pub(crate) fn mark_cross(bounds: Size, p: Point, rectangle: Rectangle) -> Geometry {
-    let mut frame = Frame::new(bounds);
-    let Size { width, height } = frame.size();
+pub(crate) fn mark_cross(bounds: Rectangle, p: Point, rectangle: Rectangle) -> Geometry {
+    let size = bounds.size();
+    let Size { width, height } = size;
+    let mut frame = Frame::new(size);
+    let p = p - Vector {
+        x: bounds.x,
+        y: bounds.y,
+    };
     text(
         &mut frame,
         rectangle.x + p.x / width * rectangle.width,

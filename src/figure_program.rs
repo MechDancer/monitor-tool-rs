@@ -74,11 +74,10 @@ impl Program<Message> for FigureProgram {
     }
 
     fn draw(&self, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry> {
-        let size = bounds.size();
-        let (rectangle, mut geometries) = task::block_on(self.0.lock()).draw(size);
+        let (rectangle, mut geometries) = task::block_on(self.0.lock()).draw(bounds.size());
         if let Cursor::Available(p) = cursor {
-            if is_available(size, p) {
-                geometries.push(mark_cross(size, p, rectangle));
+            if is_available(bounds, p) {
+                geometries.push(mark_cross(bounds, p, rectangle));
             }
         }
         geometries
@@ -86,7 +85,7 @@ impl Program<Message> for FigureProgram {
 
     fn mouse_interaction(&self, bounds: Rectangle, cursor: Cursor) -> mouse::Interaction {
         if let Cursor::Available(p) = cursor {
-            if is_available(bounds.size(), p) {
+            if is_available(bounds, p) {
                 return mouse::Interaction::Crosshair;
             }
         }
