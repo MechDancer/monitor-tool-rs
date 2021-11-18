@@ -53,44 +53,61 @@ impl TopicCache {
 
     /// 画图
     pub fn draw(&mut self, items: Items, size: Size, scale: f32) -> Geometry {
+        const MASS: usize = 2000;
+        const WIDTH: f32 = 1.5;
+        const D: f32 = 3.5;
+
         let items = items.collect::<Vec<_>>();
-        let mass = items.len() > 10000;
+        let mass = items.len() > MASS;
+        let d = if mass { WIDTH } else { D } / scale;
+        let len_arrow = 15.0 / scale;
+        let offset = Vector { x: d, y: d } * -0.5;
+
         self.cache.draw(size, |frame| {
             frame.translate(frame.center() - Point::ORIGIN);
             frame.scale(scale);
-            let radius = 2.0 / scale;
+
+            let size = Size {
+                width: d,
+                height: d,
+            };
+            let mut stroke = Stroke {
+                width: WIDTH,
+                ..Default::default()
+            };
+            let mut tied = false;
             for item in items.iter().copied() {
                 match item {
                     FigureItem::Point(p, color) => {
-                        if !mass {
-                            frame.fill(&Path::circle(p, radius), color);
+                        // 小规模时一定画点
+                        // 大规模时如果连了线就不画点
+                        if !mass || !tied {
+                            frame.fill_rectangle(p + offset, size, color);
+                        }
+                        // 没有画点，标记连线已使用
+                        else {
+                            tied = false;
                         }
                     }
                     FigureItem::Arrow(p, d, color) => {
+                        if !mass {
+                            frame.fill_rectangle(p + offset, size, color)
+                        }
                         let (sin, cos) = d.sin_cos();
-                        let d = Vector {
-                            x: cos * 15.0,
-                            y: sin * -15.0,
-                        };
-                        frame.fill(&Path::circle(p, radius), color);
-                        frame.stroke(
-                            &Path::line(p, p + d),
-                            Stroke {
-                                color,
-                                width: 1.5,
-                                ..Default::default()
-                            },
-                        );
+                        let d = Vector { x: cos, y: sin } * len_arrow;
+                        stroke.color = color;
+                        frame.stroke(&Path::line(p, p + d), stroke);
                     }
                     FigureItem::Tie(p0, p1, color) => {
-                        frame.stroke(
-                            &Path::line(p0, p1),
-                            Stroke {
-                                color,
-                                width: 1.5,
-                                ..Default::default()
-                            },
-                        );
+                        // 大规模时尽量连线，否则只连足够长的线
+                        tied = mass || {
+                            let v = p0 - p1;
+                            (v.x.powi(2) + v.y.powi(2)) * scale > 0.1
+                        };
+                        if tied {
+                            stroke.color = color;
+                            frame.stroke(&Path::line(p0, p1), stroke);
+                        }
                     }
                 }
             }
