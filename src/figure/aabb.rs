@@ -23,7 +23,8 @@ impl From<Point> for AABB {
 
 impl AABB {
     /// 计算一组点的 AABB 盒
-    pub fn foreach(mut iter: impl Iterator<Item = Point>) -> Option<Self> {
+    pub fn foreach(iter: impl IntoIterator<Item = Point>) -> Option<Self> {
+        let mut iter = iter.into_iter();
         iter.next().map(|front| {
             let mut aabb = AABB::from(front);
             iter.for_each(|p| aabb.absorb(p));
@@ -47,6 +48,11 @@ impl AABB {
             x: (self.min_x + self.max_x) / 2.0,
             y: (self.min_y + self.max_y) / 2.0,
         }
+    }
+
+    #[inline]
+    pub fn contains(&self, p: Point) -> bool {
+        self.min_x <= p.x && p.x <= self.max_x && self.min_y <= p.y && p.y <= self.max_y
     }
 
     /// 吸收一个点，可能扩大盒范围

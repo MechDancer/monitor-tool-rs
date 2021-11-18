@@ -116,27 +116,20 @@ impl Program<Message> for FigureProgram {
 
 impl FigureCanvas {
     fn draw(&mut self, size: Size) -> (Rectangle, Vec<Geometry>) {
-        let t0 = Instant::now();
+        let time = Instant::now();
         // 绘制数据
         let mut result = self.figure.draw(size, available_size(size));
-        let t1 = Instant::now();
         // 绘制边框
         result.1.push(
             self.border_cache
                 .draw(size, |frame| border(frame, Color::BLACK)),
         );
-        let t2 = Instant::now();
         // 计时
-        {
-            let last = std::mem::replace(&mut self.update_time, t0);
-            let period = t0 - last;
-            println!(
-                "period = {:?}, delay = {:?} | {:?}",
-                period,
-                t1 - t0,
-                t2 - t1
-            );
-        }
+        println!(
+            "period = {:?}, delay = {:?}",
+            time - std::mem::replace(&mut self.update_time, time),
+            Instant::now() - time,
+        );
         result
     }
 }

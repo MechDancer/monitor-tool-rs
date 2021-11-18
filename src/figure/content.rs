@@ -90,8 +90,8 @@ impl TopicContent {
 
     /// 画图
     #[inline]
-    pub fn draw(&mut self) -> Option<Geometry> {
-        Items::new(&self.queue, &mut self.color_map).map(|items| self.cache.draw(items))
+    pub fn draw(&mut self, aabb: AABB) -> Option<Geometry> {
+        Items::new(&self.queue, &mut self.color_map, aabb).map(|items| self.cache.draw(items))
     }
 
     /// 向队列添加一组点

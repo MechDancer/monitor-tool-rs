@@ -54,8 +54,9 @@ impl Figure {
 
     /// 画图
     pub fn draw(&mut self, bounds: Size, available_bounds: Size) -> (Rectangle, Vec<Geometry>) {
+        let now = Instant::now();
         // 各组同步
-        self.sync(Instant::now());
+        self.sync(now);
         self.view.size = bounds;
         // 计算自动范围
         if self.auto_view {
@@ -76,7 +77,9 @@ impl Figure {
         let diagonal = Vector {
             x: bounds.width,
             y: bounds.height,
-        } * (1.0 / self.view.scale);
+        } * (0.5 / self.view.scale);
+        let aabb =
+            AABB::foreach([self.view.center - diagonal, self.view.center + diagonal]).unwrap();
         // 写入配置并绘制
         let geometries = self
             .topics
@@ -84,15 +87,15 @@ impl Figure {
             .filter(|content| check_visible(&self.visible_layers, &content.layer))
             .filter_map(|content| {
                 content.set_config(self.view);
-                content.draw()
+                content.draw(aabb)
             })
             .collect();
         (
             Rectangle {
-                x: self.view.center.x - diagonal.x * 0.5,
-                y: self.view.center.y + diagonal.y * 0.5,
-                width: diagonal.x,
-                height: diagonal.y,
+                x: self.view.center.x - diagonal.x,
+                y: self.view.center.y + diagonal.y,
+                width: diagonal.x * 2.0,
+                height: diagonal.y * 2.0,
             },
             geometries,
         )
