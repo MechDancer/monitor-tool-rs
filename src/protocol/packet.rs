@@ -218,7 +218,7 @@ fn send() {
         encoder.topic_set_capacity("test", 20000);
         encoder.topic_set_focus("test", 200);
         encoder.topic_clear("test");
-        encoder.sync_set("test", &["test"], Some(Duration::from_secs(1)));
+        // encoder.sync_set("test", &["test"], Some(Duration::from_secs(1)));
         for i in 0..255 {
             let color: [u8; 4] = rng.gen::<Srgba>().into_format().into_raw();
             encoder.topic_set_color("test", i, RGBA(color[0], color[1], color[2], color[3]))

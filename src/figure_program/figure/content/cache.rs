@@ -103,7 +103,7 @@ impl TopicCache {
                         // 大规模时尽量连线，否则只连足够长的线
                         tied = mass || {
                             let v = p0 - p1;
-                            (v.x.powi(2) + v.y.powi(2)) * scale > 0.1
+                            (v.x.powi(2) + v.y.powi(2)) * scale.powi(2) > 0.1
                         };
                         if tied {
                             stroke.color = color;

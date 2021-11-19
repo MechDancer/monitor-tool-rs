@@ -14,7 +14,7 @@ mod content;
 
 use aabb::AABB;
 use border::border;
-pub(super) use border::{is_available, mark_cross};
+pub(super) use border::{as_available, mark_cross};
 pub(crate) use content::TopicContent;
 
 use self::border::available_size;
@@ -24,7 +24,7 @@ pub(crate) struct Figure {
     update_time: Instant,
     print_time: bool,
 
-    auto_view: bool,
+    pub auto_view: bool,
     view: View,
 
     topics: HashMap<String, Option<Box<TopicContent>>>,
@@ -102,6 +102,14 @@ impl Figure {
             self.view.center = self.view.center + Vector { x, y: -y };
         }
         self.view.size = bounds.size();
+        self.redraw();
+    }
+
+    /// 拖动
+    pub fn grab(&mut self, v: Vector) {
+        self.auto_view = false;
+        self.view.center.x -= v.x / self.view.scale;
+        self.view.center.y += v.y / self.view.scale;
         self.redraw();
     }
 
@@ -219,6 +227,7 @@ impl Figure {
         self.topics.get_mut(topic).map(|c| unwrap!(mut; c))
     }
 
+    /// 是否打印时间
     pub fn set_print_time(&mut self, value: bool) {
         self.print_time = value;
     }

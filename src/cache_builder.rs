@@ -40,6 +40,8 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
         match event {
             Zoom(pos, bounds, level) => figure.zoom(level, pos, bounds),
             Resize(bounds) => figure.zoom(0.0, Point::ORIGIN, bounds),
+            ReadyForGrab => figure.auto_view = false,
+            Grab(v) => figure.grab(v),
             Packet(time, buf) => decode(figure.as_mut(), time, buf.as_slice()),
             Line(line) => {
                 let words = line.split_whitespace().collect::<Vec<_>>();

@@ -30,12 +30,16 @@ pub(super) fn border(frame: &mut Frame, color: Color) {
 }
 
 #[inline]
-pub(crate) fn is_available(mut bounds: Rectangle, p: Point) -> bool {
-    bounds.x += BORDER_OFFSET.x;
-    bounds.y += BORDER_OFFSET.y;
-    bounds.width -= BORDER_OFFSET.x * 2.0;
-    bounds.height -= BORDER_OFFSET.y * 2.0;
-    bounds.contains(p)
+pub(crate) fn as_available(mut bounds: Rectangle, cursor: Cursor) -> Option<Point> {
+    if let Cursor::Available(p) = cursor {
+        bounds.x += BORDER_OFFSET.x;
+        bounds.y += BORDER_OFFSET.y;
+        bounds.width -= BORDER_OFFSET.x * 2.0;
+        bounds.height -= BORDER_OFFSET.y * 2.0;
+        Some(p).filter(|p| bounds.contains(*p))
+    } else {
+        None
+    }
 }
 
 pub(crate) fn mark_cross(bounds: Rectangle, p: Point, rectangle: Rectangle) -> Geometry {
