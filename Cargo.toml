@@ -6,6 +6,8 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 readme = "README.md"
 
 [dependencies]
+palette = "*"
+rand = { version = "*", optional = true }
 iced = { version = "*", optional = true, features = [
     "glow",
     "glow_canvas",
@@ -17,4 +19,4 @@ async-std = { version = "*", optional = true }
 [features]
 default = ["sender", "app"]
 app = ["iced", "iced_futures", "async-std"]
-sender = []
+sender = ["rand", "palette/random"]

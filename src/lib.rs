@@ -2,7 +2,22 @@
 mod figure_program;
 
 #[cfg(feature = "app")]
-pub use figure_program::*;
+mod cache_builder;
+
+#[cfg(feature = "app")]
+mod command_receiver;
+
+#[cfg(feature = "app")]
+pub use app::*;
+
+#[cfg(feature = "app")]
+mod app {
+    use super::*;
+    pub use cache_builder::spawn_background as spawn_draw;
+    pub use command_receiver::spawn_background as spawn_receive;
+    pub(crate) use figure_program::Figure;
+    pub use figure_program::{CacheComplete, FigureEvent, FigureProgram};
+}
 
 mod protocol;
 

@@ -14,7 +14,7 @@ mod content;
 
 use aabb::AABB;
 use border::border;
-pub(super) use border::{is_available, mark_cross};
+pub(super) use border::{as_available, mark_cross};
 pub(crate) use content::TopicContent;
 
 use self::border::available_size;
@@ -22,6 +22,7 @@ use self::border::available_size;
 /// 画面
 pub(crate) struct Figure {
     update_time: Instant,
+    print_time: bool,
 
     pub auto_view: bool,
     view: View,
@@ -54,6 +55,7 @@ impl Figure {
     pub fn new() -> Self {
         Self {
             update_time: Instant::now(),
+            print_time: true,
 
             auto_view: false,
             view: View::DEFAULT,
@@ -79,6 +81,7 @@ impl Figure {
             if scale_x == 0.0 || scale_y == 0.0 {
                 self.auto_view = true;
             } else {
+                self.auto_view = false;
                 self.view.scale = f32::min(scale_x, scale_y);
             }
         }
@@ -88,30 +91,33 @@ impl Figure {
     }
 
     /// 放缩
-    pub fn zoom(&mut self, level: f32, pos: Point, bounds: Size) {
+    pub fn zoom(&mut self, level: f32, pos: Point, bounds: Rectangle) {
+        self.auto_view = false;
         // 计算尺度
-        let k = if level > 0.0 {
-            1.1f32.powf(level)
-        } else {
-            0.9f32.powf(-level)
-        };
-        self.view.scale *= k;
-        // 计算中心偏移
-        let c = Point {
-            x: bounds.width * 0.5,
-            y: bounds.height * 0.5,
-        };
-        let Vector { x, y } = (pos - c) * ((k - 1.0) / self.view.scale);
-        self.view.center = self.view.center + Vector { x, y: -y };
+        if level.is_normal() {
+            let k = (1.0 + level.signum() * 0.1).powf(level.abs());
+            self.view.scale *= k;
+            // 计算中心偏移
+            let Vector { x, y } = (pos - bounds.center()) * ((k - 1.0) / self.view.scale);
+            self.view.center = self.view.center + Vector { x, y: -y };
+        }
+        self.view.size = bounds.size();
+        self.redraw();
+    }
+
+    /// 拖动
+    pub fn grab(&mut self, v: Vector) {
+        self.auto_view = false;
+        self.view.center.x -= v.x / self.view.scale;
+        self.view.center.y += v.y / self.view.scale;
         self.redraw();
     }
 
     /// 画图
-    pub fn draw(&mut self, bounds: Size) -> (Rectangle, Vec<Geometry>) {
+    pub fn draw(&mut self) -> (Rectangle, Vec<Geometry>) {
         let time = Instant::now();
         // 各组同步
         self.sync(time);
-        self.view.size = bounds;
         // 计算自动范围
         if self.auto_view {
             if let Some(aabb) = self.aabb() {
@@ -119,7 +125,7 @@ impl Figure {
                 self.view.center = aabb.center();
 
                 let Size { width, height } = aabb.size();
-                let available_bounds = available_size(bounds);
+                let available_bounds = available_size(self.view.size);
                 let new = f32::min(
                     available_bounds.width / width,
                     available_bounds.height / height,
@@ -134,8 +140,8 @@ impl Figure {
         }
         // 计算对角线
         let diagonal = Vector {
-            x: bounds.width,
-            y: bounds.height,
+            x: self.view.size.width,
+            y: self.view.size.height,
         } * (0.5 / self.view.scale);
         let aabb = AABB::foreach([
             to_canvas(self.view.center - diagonal, self.view.center),
@@ -161,7 +167,7 @@ impl Figure {
         // 绘制边框
         geometries.push(
             self.border_cache
-                .draw(bounds, |frame| border(frame, Color::BLACK)),
+                .draw(self.view.size, |frame| border(frame, Color::BLACK)),
         );
         // 收集异步绘图结果
         geometries.extend(
@@ -210,10 +216,20 @@ impl Figure {
     }
 
     /// 获取话题对象
-    pub fn topic_mut<'a>(&'a mut self, topic: String) -> &'a mut TopicContent {
+    pub fn put_topic<'a>(&'a mut self, topic: impl ToString) -> &'a mut TopicContent {
         unwrap!(mut; self.topics
-            .entry(topic)
+            .entry(topic.to_string())
             .or_insert(Some(Default::default())))
+    }
+
+    /// 获取话题对象
+    pub fn get_topic<'a>(&'a mut self, topic: &String) -> Option<&'a mut Box<TopicContent>> {
+        self.topics.get_mut(topic).map(|c| unwrap!(mut; c))
+    }
+
+    /// 是否打印时间
+    pub fn set_print_time(&mut self, value: bool) {
+        self.print_time = value;
     }
 
     /// 同步
@@ -231,7 +247,7 @@ impl Figure {
                 (None, None) => None,
                 (Some(t), None) => Some(t),
                 (None, Some(t)) => Some(t),
-                (Some(t0), Some(t1)) => Some(std::cmp::min(t0, t1)),
+                (Some(t0), Some(t1)) => Some(std::cmp::max(t0, t1)),
             } {
                 // 按期限消除
                 for t in set.iter() {
@@ -257,14 +273,17 @@ impl Figure {
         }
     }
 
+    /// 计时
     #[inline]
     fn timer(&mut self, time: Instant) {
-        // 计时
-        println!(
-            "period = {:?}, delay = {:?}",
-            time - std::mem::replace(&mut self.update_time, time),
-            Instant::now() - time,
-        );
+        let last = std::mem::replace(&mut self.update_time, time);
+        if self.print_time {
+            println!(
+                "period = {:?}, delay = {:?}",
+                time - last,
+                Instant::now() - time,
+            );
+        }
     }
 }
 

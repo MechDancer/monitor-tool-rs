@@ -1,7 +1,7 @@
 ﻿use iced::{Point, Size};
 
 /// 用外边界表示的范围盒子
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct AABB {
     min_x: f32,
     max_x: f32,

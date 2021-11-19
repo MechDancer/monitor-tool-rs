@@ -1,124 +1,152 @@
-﻿use crate::decode;
+﻿use std::time::Instant;
+
 use async_std::{
-    net::UdpSocket,
+    channel::{Receiver, Sender},
     sync::{Arc, Mutex},
     task,
 };
 use iced::{
     canvas::{event, Cursor, Event, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    mouse, Rectangle,
+    mouse::{self, Button},
+    Point, Rectangle, Vector,
 };
 use iced_futures::subscription::Recipe;
-use std::time::Instant;
 
+mod anchor;
 mod figure;
 
+use anchor::Anchor;
 pub(crate) use figure::Figure;
-use figure::{is_available, mark_cross};
+use figure::{as_available, mark_cross};
 
 #[derive(Clone)]
-pub struct FigureProgram(Arc<Mutex<Figure>>);
+pub struct FigureProgram {
+    pub sender: Sender<FigureEvent>,
+    pub state: (Rectangle, Vec<Geometry>),
+    bounds: Arc<Mutex<Rectangle>>,
+    anchor: Arc<Mutex<Anchor>>,
+}
 
-pub struct UdpReceiver(u16);
+pub struct CacheComplete(pub Receiver<(Rectangle, Vec<Geometry>)>);
 
 #[derive(Debug)]
-pub enum Message {
-    MessageReceived(Instant, Vec<u8>),
-    ViewUpdated,
+pub enum FigureEvent {
+    Zoom(Point, Rectangle, f32),
+    Resize(Rectangle),
+    ReadyForGrab,
+    Grab(Vector),
+    Packet(Instant, Vec<u8>),
+    Line(String),
 }
 
 impl FigureProgram {
-    #[inline]
-    pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(Figure::new())))
+    pub fn new(sender: Sender<FigureEvent>) -> Self {
+        Self {
+            sender,
+            state: Default::default(),
+            bounds: Default::default(),
+            anchor: Default::default(),
+        }
     }
 
     #[inline]
-    pub fn receive(&self, time: Instant, buf: &[u8]) {
-        decode(&mut task::block_on(self.0.lock()), time, buf);
+    fn send(&self, event: FigureEvent) {
+        let _ = task::block_on(self.sender.send(event));
     }
 }
 
-impl Program<Message> for FigureProgram {
+impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
     fn update(
         &mut self,
         event: Event,
         bounds: Rectangle,
         cursor: Cursor,
-    ) -> (event::Status, Option<Message>) {
-        let pos = if let Some(position) = cursor.position_in(&bounds) {
-            position
+    ) -> (event::Status, Option<(Rectangle, Vec<Geometry>)>) {
+        let pos = if let Some(p) = as_available(bounds, cursor) {
+            p
         } else {
             return (event::Status::Ignored, None);
         };
-        let bounds = bounds.size();
 
-        use mouse::{Event::*, ScrollDelta};
+        use mouse::{Button::*, Event::*, ScrollDelta};
         match event {
             event::Event::Mouse(mouse_event) => match mouse_event {
                 WheelScrolled {
                     delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
                 } => {
-                    task::block_on(async {
-                        let figure = &mut self.0.lock().await;
-                        figure.auto_view = false;
-                        figure.zoom(y, pos, bounds);
-                    });
-                    (event::Status::Captured, Some(Message::ViewUpdated))
+                    self.send(FigureEvent::Zoom(pos, bounds, y));
                 }
-                _ => (event::Status::Ignored, None),
+                ButtonPressed(b) => match b {
+                    Left => {
+                        *task::block_on(self.anchor.lock()) = Anchor {
+                            bounds,
+                            pos,
+                            which: Some(b),
+                        };
+                        self.send(FigureEvent::ReadyForGrab);
+                    }
+                    _ => {}
+                },
+                ButtonReleased(b) => match b {
+                    Left => {
+                        task::block_on(self.anchor.lock()).which = None;
+                    }
+                    _ => {}
+                },
+                CursorMoved { position: _ } => {
+                    let mut anchor = task::block_on(self.anchor.lock());
+                    if anchor.which == Some(Button::Left) {
+                        self.send(FigureEvent::Grab(pos - anchor.pos));
+                        anchor.pos = pos;
+                    }
+                }
+                _ => {}
             },
-            _ => (event::Status::Ignored, None),
+            _ => {}
         }
+        (event::Status::Ignored, None)
     }
 
     fn draw(&self, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry> {
-        let (rectangle, mut geometries) = task::block_on(self.0.lock()).draw(bounds.size());
-        if let Cursor::Available(p) = cursor {
-            if is_available(bounds, p) {
-                geometries.push(mark_cross(bounds, p, rectangle));
-            }
+        let mut memory = task::block_on(self.bounds.lock());
+        if bounds != *memory {
+            *memory = bounds;
+            self.send(FigureEvent::Resize(bounds));
+        }
+        let mut geometries = self.state.1.clone();
+        if let Some(p) = as_available(bounds, cursor) {
+            geometries.push(mark_cross(bounds, p, self.state.0));
         }
         geometries
     }
 
     fn mouse_interaction(&self, bounds: Rectangle, cursor: Cursor) -> mouse::Interaction {
-        if let Cursor::Available(p) = cursor {
-            if is_available(bounds, p) {
-                return mouse::Interaction::Crosshair;
+        use mouse::Interaction;
+        if as_available(bounds, cursor).is_some() {
+            if task::block_on(self.anchor.lock()).which == Some(Button::Left) {
+                Interaction::Grab
+            } else {
+                Interaction::Crosshair
             }
+        } else {
+            Interaction::default()
         }
-        mouse::Interaction::default()
     }
 }
 
-impl UdpReceiver {
-    pub const fn new(port: u16) -> Self {
-        Self(port)
-    }
-}
-
-impl<H, E> Recipe<H, E> for UdpReceiver
+impl<H, E> Recipe<H, E> for CacheComplete
 where
     H: std::hash::Hasher,
 {
-    type Output = Message;
+    type Output = (Rectangle, Vec<Geometry>);
 
     fn hash(&self, state: &mut H) {
         use std::hash::Hash;
         std::any::TypeId::of::<Self>().hash(state);
-        self.0.hash(state);
     }
 
     fn stream(self: Box<Self>, _input: BoxStream<'static, E>) -> BoxStream<'static, Self::Output> {
-        let socket =
-            Arc::new(task::block_on(UdpSocket::bind(format!("0.0.0.0:{}", self.0))).unwrap());
-        let mut buf = [0u8; 65536];
-        Box::pin(repeat_with(move || {
-            let socket = socket.clone();
-            let (len, _) = task::block_on(socket.recv_from(&mut buf)).unwrap();
-            Message::MessageReceived(Instant::now(), buf[..len].to_vec())
-        }))
+        Box::pin(repeat_with(move || task::block_on(self.0.recv()).unwrap()))
     }
 }
