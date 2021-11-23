@@ -1,17 +1,15 @@
-﻿use std::time::Instant;
-
-use async_std::{
+﻿use async_std::{
     channel::{Receiver, Sender},
     sync::{Arc, Mutex},
     task,
 };
 use iced::{
-    canvas::{event, Cursor, Event, Geometry, Program},
+    canvas::{event, Cursor, Event, Frame, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    mouse::{self, Button},
-    Point, Rectangle, Vector,
+    keyboard, mouse, Point, Rectangle, Vector,
 };
 use iced_futures::subscription::Recipe;
+use std::time::Instant;
 
 mod anchor;
 mod figure;
@@ -19,6 +17,8 @@ mod figure;
 use anchor::Anchor;
 pub(crate) use figure::Figure;
 use figure::{as_available, mark_cross};
+
+use self::figure::mark_anchor;
 
 #[derive(Clone)]
 pub struct FigureProgram {
@@ -28,14 +28,17 @@ pub struct FigureProgram {
     anchor: Arc<Mutex<Anchor>>,
 }
 
+/// 订阅新近完成的图像缓存
 pub struct CacheComplete(pub Receiver<(Rectangle, Vec<Geometry>)>);
 
 #[derive(Debug)]
 pub enum FigureEvent {
+    Auto,
     Zoom(Point, Rectangle, f32),
     Resize(Rectangle),
     ReadyForGrab,
     Grab(Vector),
+    Select(Rectangle, Point, Point),
     Packet(Instant, Vec<u8>),
     Line(String),
 }
@@ -63,14 +66,27 @@ impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
         bounds: Rectangle,
         cursor: Cursor,
     ) -> (event::Status, Option<(Rectangle, Vec<Geometry>)>) {
-        let pos = if let Some(p) = as_available(bounds, cursor) {
-            p
+        let pos = if let Some(pos) = as_available(bounds, cursor) {
+            pos
         } else {
+            task::block_on(self.anchor.lock()).which = None;
             return (event::Status::Ignored, None);
         };
 
+        use keyboard::{Event::*, KeyCode::Space};
         use mouse::{Button::*, Event::*, ScrollDelta};
         match event {
+            event::Event::Keyboard(keyboard_event) => match keyboard_event {
+                KeyPressed {
+                    key_code,
+                    modifiers: _,
+                } => {
+                    if key_code == Space {
+                        self.send(FigureEvent::Auto);
+                    }
+                }
+                _ => {}
+            },
             event::Event::Mouse(mouse_event) => match mouse_event {
                 WheelScrolled {
                     delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },
@@ -78,9 +94,8 @@ impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
                     self.send(FigureEvent::Zoom(pos, bounds, y));
                 }
                 ButtonPressed(b) => match b {
-                    Left => {
+                    Left | Right => {
                         *task::block_on(self.anchor.lock()) = Anchor {
-                            bounds,
                             pos,
                             which: Some(b),
                         };
@@ -90,33 +105,59 @@ impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
                 },
                 ButtonReleased(b) => match b {
                     Left => {
-                        task::block_on(self.anchor.lock()).which = None;
+                        let mut anchor = task::block_on(self.anchor.lock());
+                        if anchor.which == Some(Left) {
+                            anchor.which = None;
+                        }
+                    }
+                    Right => {
+                        let mut anchor = task::block_on(self.anchor.lock());
+                        if anchor.which == Some(Right) {
+                            anchor.which = None;
+                            self.send(FigureEvent::Select(bounds, anchor.pos, pos));
+                        }
                     }
                     _ => {}
                 },
                 CursorMoved { position: _ } => {
                     let mut anchor = task::block_on(self.anchor.lock());
-                    if anchor.which == Some(Button::Left) {
-                        self.send(FigureEvent::Grab(pos - anchor.pos));
-                        anchor.pos = pos;
+                    if let Some(Left) = anchor.which {
+                        self.send(FigureEvent::Grab(
+                            pos - std::mem::replace(&mut anchor.pos, pos),
+                        ));
                     }
                 }
                 _ => {}
             },
-            _ => {}
         }
         (event::Status::Ignored, None)
     }
 
     fn draw(&self, bounds: Rectangle, cursor: Cursor) -> Vec<Geometry> {
-        let mut memory = task::block_on(self.bounds.lock());
-        if bounds != *memory {
-            *memory = bounds;
-            self.send(FigureEvent::Resize(bounds));
-        }
+        let pos = as_available(bounds, cursor);
+        // 画图像
         let mut geometries = self.state.1.clone();
+        // 响应 resize
+        let mut anchor = task::block_on(self.anchor.lock());
+        if bounds != std::mem::replace(&mut *task::block_on(self.bounds.lock()), bounds) {
+            self.send(FigureEvent::Resize(bounds));
+            if anchor.which.is_some() {
+                if let Some(pos) = pos {
+                    anchor.pos = pos;
+                } else {
+                    anchor.which = None;
+                }
+            }
+        }
         if let Some(p) = as_available(bounds, cursor) {
-            geometries.push(mark_cross(bounds, p, self.state.0));
+            // 画光标
+            let mut frame = Frame::new(bounds.size());
+            mark_cross(&mut frame, bounds, p, self.state.0);
+            // 画候选框
+            if anchor.which == Some(mouse::Button::Right) {
+                mark_anchor(&mut frame, anchor.pos, p);
+            }
+            geometries.push(frame.into_geometry());
         }
         geometries
     }
@@ -124,7 +165,7 @@ impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
     fn mouse_interaction(&self, bounds: Rectangle, cursor: Cursor) -> mouse::Interaction {
         use mouse::Interaction;
         if as_available(bounds, cursor).is_some() {
-            if task::block_on(self.anchor.lock()).which == Some(Button::Left) {
+            if task::block_on(self.anchor.lock()).which == Some(mouse::Button::Left) {
                 Interaction::Grab
             } else {
                 Interaction::Crosshair

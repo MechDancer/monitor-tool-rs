@@ -3,18 +3,15 @@
     app::run();
 }
 
-#[cfg(feature = "sender")]
-mod sender {}
-
 #[cfg(feature = "app")]
 mod app {
-    use std::cell::Cell;
-
     use async_std::channel::{unbounded, Receiver};
     use iced::{
-        canvas::Geometry, executor, Application, Canvas, Command, Rectangle, Settings, Subscription,
+        canvas::Geometry, executor, Application, Canvas, Command, Length::Fill, Rectangle,
+        Settings, Subscription,
     };
     use monitor_tool::{spawn_draw, spawn_receive, CacheComplete, FigureProgram};
+    use std::cell::Cell;
 
     pub fn run() {
         let _ = Main::run(Settings {
@@ -62,11 +59,10 @@ mod app {
         }
 
         fn subscription(&self) -> Subscription<Self::Message> {
-            if let Some(r) = self.painter.replace(None) {
-                Subscription::from_recipe(CacheComplete(r))
-            } else {
-                Subscription::none()
-            }
+            self.painter
+                .take()
+                .map(|r| Subscription::from_recipe(CacheComplete(r)))
+                .unwrap_or(Subscription::none())
         }
 
         fn update(
@@ -79,7 +75,6 @@ mod app {
         }
 
         fn view(&mut self) -> iced::Element<'_, Self::Message> {
-            use iced::Length::Fill;
             Canvas::new(self.program.clone())
                 .width(Fill)
                 .height(Fill)

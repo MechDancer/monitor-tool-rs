@@ -38,15 +38,16 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
     task::spawn_blocking(move || {
         use FigureEvent::*;
         match event {
+            Auto => figure.auto_view = true,
             Zoom(pos, bounds, level) => figure.zoom(level, pos, bounds),
             Resize(bounds) => figure.zoom(0.0, Point::ORIGIN, bounds),
             ReadyForGrab => figure.auto_view = false,
             Grab(v) => figure.grab(v),
+            Select(bounds, p0, p1) => figure.select(bounds, p0, p1),
             Packet(time, buf) => decode(figure.as_mut(), time, buf.as_slice()),
             Line(line) => {
                 let words = line.split_whitespace().collect::<Vec<_>>();
                 match words.as_slice() {
-                    ["auto"] => figure.set_view(f32::NAN, f32::NAN, 0.0, 0.0),
                     ["log", "time"] => figure.set_print_time(true),
                     ["unlog", "time"] => figure.set_print_time(false),
                     [title, "focus", num] => {

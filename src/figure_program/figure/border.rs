@@ -42,16 +42,28 @@ pub(crate) fn as_available(mut bounds: Rectangle, cursor: Cursor) -> Option<Poin
     }
 }
 
-pub(crate) fn mark_cross(bounds: Rectangle, p: Point, rectangle: Rectangle) -> Geometry {
+macro_rules! line {
+    ($frame:expr; ($x0:expr, $y0:expr) => ($x1:expr, $y1:expr); $color:expr) => {
+        $frame.stroke(
+            &Path::line(Point { x: $x0, y: $y0 }, Point { x: $x1, y: $y1 }),
+            Stroke {
+                color: $color,
+                width: 1.0,
+                ..Default::default()
+            },
+        )
+    };
+}
+
+pub(crate) fn mark_cross(frame: &mut Frame, bounds: Rectangle, p: Point, rectangle: Rectangle) {
     let size = bounds.size();
     let Size { width, height } = size;
-    let mut frame = Frame::new(size);
     let p = p - Vector {
         x: bounds.x,
         y: bounds.y,
     };
     text(
-        &mut frame,
+        frame,
         rectangle.x + p.x / width * rectangle.width,
         Point {
             x: p.x + 4.0,
@@ -61,7 +73,7 @@ pub(crate) fn mark_cross(bounds: Rectangle, p: Point, rectangle: Rectangle) -> G
         Color::BLACK,
     );
     text(
-        &mut frame,
+        frame,
         rectangle.y - p.y / height * rectangle.height,
         Point {
             x: 4.0,
@@ -70,61 +82,15 @@ pub(crate) fn mark_cross(bounds: Rectangle, p: Point, rectangle: Rectangle) -> G
         24.0,
         Color::BLACK,
     );
-    line(
-        &mut frame,
-        Point { x: 0.0, y: p.y },
-        Point {
-            x: p.x - 20.0,
-            y: p.y,
-        },
-        Color::BLACK,
-    );
-    line(
-        &mut frame,
-        Point { x: p.x, y: 0.0 },
-        Point {
-            x: p.x,
-            y: p.y - 18.0,
-        },
-        Color::BLACK,
-    );
-    line(
-        &mut frame,
-        Point {
-            x: p.x + 20.0,
-            y: p.y,
-        },
-        Point {
-            x: width - BORDER_OFFSET.x,
-            y: p.y,
-        },
-        Color::BLACK,
-    );
-    line(
-        &mut frame,
-        Point {
-            x: p.x,
-            y: p.y + 22.0,
-        },
-        Point {
-            x: p.x,
-            y: height - BORDER_OFFSET.y,
-        },
-        Color::BLACK,
-    );
-    frame.into_geometry()
+    line!(frame; (0.0, p.y) => (p.x - 20.0, p.y       ); Color::BLACK);
+    line!(frame; (p.x, 0.0) => (p.x       , p.y - 18.0); Color::BLACK);
+    line!(frame; (p.x + 20.0, p.y       ) => (width - BORDER_OFFSET.x,  p.y); Color::BLACK);
+    line!(frame; (p.x       , p.y + 22.0) => (p.x, height - BORDER_OFFSET.y); Color::BLACK);
 }
 
-#[inline]
-fn line(frame: &mut Frame, p0: Point, p1: Point, color: Color) {
-    frame.stroke(
-        &Path::line(p0, p1),
-        Stroke {
-            color,
-            width: 1.0,
-            ..Default::default()
-        },
-    );
+pub(crate) fn mark_anchor(frame: &mut Frame, p0: Point, p1: Point) {
+    line!(frame; (p0.x, p0.y) => (p0.x, p1.y); Color::BLACK);
+    line!(frame; (p0.x, p0.y) => (p1.x, p0.y); Color::BLACK);
 }
 
 #[inline]
