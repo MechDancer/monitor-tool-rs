@@ -77,7 +77,7 @@ impl<'a> Iterator for Items<'a> {
                             return if v.dir.is_nan() {
                                 Some(FigureItem::Point(pos, color))
                             } else {
-                                Some(FigureItem::Arrow(pos, v.dir, color))
+                                Some(FigureItem::Arrow(pos, -v.dir, color))
                             };
                         }
                     }
