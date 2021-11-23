@@ -13,11 +13,10 @@ mod border;
 mod content;
 
 use aabb::AABB;
-use border::border;
-pub(super) use border::{as_available, mark_cross};
-pub(crate) use content::TopicContent;
+use border::{available_size, border};
 
-use self::border::available_size;
+pub(super) use border::{as_available, mark_anchor, mark_cross};
+pub(crate) use content::TopicContent;
 
 /// 画面
 pub(crate) struct Figure {
@@ -113,6 +112,23 @@ impl Figure {
         self.redraw();
     }
 
+    /// 框选
+    pub fn select(&mut self, bounds: Rectangle, p0: Point, p1: Point) {
+        self.auto_view = false;
+        let k = 1.0 / self.view.scale;
+        let v0 = (p0 - bounds.center()) * k;
+        let v1 = (p1 - bounds.center()) * k;
+        let p0 = Point {
+            x: self.view.center.x + v0.x,
+            y: self.view.center.y - v0.y,
+        };
+        let p1 = Point {
+            x: self.view.center.x + v1.x,
+            y: self.view.center.y - v1.y,
+        };
+        self.set_view_by_aabb(AABB::foreach([p0, p1]).unwrap());
+    }
+
     /// 画图
     pub fn draw(&mut self) -> (Rectangle, Vec<Geometry>) {
         let time = Instant::now();
@@ -121,21 +137,7 @@ impl Figure {
         // 计算自动范围
         if self.auto_view {
             if let Some(aabb) = self.aabb() {
-                let old = self.view;
-                self.view.center = aabb.center();
-
-                let Size { width, height } = aabb.size();
-                let available_bounds = available_size(self.view.size);
-                let new = f32::min(
-                    available_bounds.width / width,
-                    available_bounds.height / height,
-                );
-                if new.is_finite() {
-                    self.view.scale = new;
-                }
-                if self.view != old {
-                    self.redraw();
-                }
+                self.set_view_by_aabb(aabb);
             }
         }
         // 计算对角线
@@ -144,8 +146,8 @@ impl Figure {
             y: self.view.size.height,
         } * (0.5 / self.view.scale);
         let aabb = AABB::foreach([
-            to_canvas(self.view.center - diagonal, self.view.center),
-            to_canvas(self.view.center + diagonal, self.view.center),
+            convert(self.view.center - diagonal, self.view.center),
+            convert(self.view.center + diagonal, self.view.center),
         ])
         .unwrap();
         let view = self.view;
@@ -266,6 +268,25 @@ impl Figure {
             .reduce(|sum, it| sum + it)
     }
 
+    /// 根据范围设置视野
+    fn set_view_by_aabb(&mut self, aabb: AABB) {
+        let old = self.view;
+        self.view.center = aabb.center();
+
+        let Size { width, height } = aabb.size();
+        let available_bounds = available_size(self.view.size);
+        let new = f32::min(
+            available_bounds.width / width,
+            available_bounds.height / height,
+        );
+        if new.is_finite() {
+            self.view.scale = new;
+        }
+        if self.view != old {
+            self.redraw();
+        }
+    }
+
     #[inline]
     fn redraw(&mut self) {
         for content in self.topics.values_mut() {
@@ -294,11 +315,10 @@ fn check_visible(set: &HashSet<String>, content: &Option<Box<TopicContent>>) -> 
 }
 
 #[inline]
-fn to_canvas(p: Point, center: Point) -> Point {
-    Point {
-        x: p.x - center.x,
-        y: center.y - p.y,
-    }
+fn convert(mut p: Point, c: Point) -> Point {
+    p.x -= c.x;
+    p.y = c.y - p.y;
+    p
 }
 
 impl View {

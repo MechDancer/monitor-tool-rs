@@ -1,6 +1,4 @@
-﻿use crate::figure_program::figure::to_canvas;
-
-use super::{FigureItem, Vertex, AABB};
+﻿use super::{super::convert, FigureItem, Vertex, AABB};
 use iced::{Color, Point};
 use std::{
     collections::{vec_deque::Iter, HashMap, VecDeque},
@@ -32,7 +30,7 @@ impl<'a> Items<'a> {
         let mut iter = queue.iter();
         iter.next().map(|(_, v)| Items {
             memory: IterMemory::Vertex(
-                to_canvas(v.pos(), center),
+                convert(v.pos(), center),
                 -v.dir,
                 *color_map.entry(v.level).or_insert(Color::BLACK),
             ),
@@ -67,7 +65,7 @@ impl<'a> Iterator for Items<'a> {
                     }
                     let v = p.unwrap().1;
                     let color = *self.color_map.entry(v.level).or_insert(Color::BLACK);
-                    let pos = to_canvas(v.pos(), self.center);
+                    let pos = convert(v.pos(), self.center);
                     if v.tie {
                         self.memory = IterMemory::Vertex(pos, -v.dir, color);
                         if self.aabb.contains(p0) || self.aabb.contains(pos) {
