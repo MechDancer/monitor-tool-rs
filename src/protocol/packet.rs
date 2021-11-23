@@ -1,9 +1,6 @@
 ﻿use super::{Camera, Visible, RGBA};
 use crate::Vertex;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 
 #[derive(Default)]
 pub struct Encoder {
@@ -12,6 +9,8 @@ pub struct Encoder {
     layers: HashMap<String, WithIndex<Visible>>,
     topics: HashMap<String, TopicBody>,
 }
+
+pub struct TopicEncoder<'a>(&'a mut TopicBody);
 
 #[derive(Default)]
 struct WithIndex<T: Default> {
@@ -42,10 +41,30 @@ macro_rules! extend {
 }
 
 impl Encoder {
+    /// 立即编码
+    #[inline]
+    pub fn with(f: impl FnOnce(&mut Encoder) -> ()) -> Vec<u8> {
+        let mut this = Self::default();
+        f(&mut this);
+        this.encode()
+    }
+
+    /// 立即编码
+    #[inline]
+    pub fn with_topic(&mut self, topic: impl ToString, f: impl FnOnce(TopicEncoder) -> ()) {
+        f(self.topic(topic.to_string()))
+    }
+
     /// 控制摄像机
     #[inline]
     pub fn camera(&mut self, camera: Camera) {
         self.camera = camera;
+    }
+
+    /// 构造话题编码器
+    #[inline]
+    pub fn topic<'a>(&'a mut self, topic: impl ToString) -> TopicEncoder<'a> {
+        TopicEncoder(self.topics.entry(topic.to_string()).or_default())
     }
 
     /// 更新同步组
@@ -97,51 +116,6 @@ impl Encoder {
         }
     }
 
-    /// 设置话题颜色
-    pub fn topic_set_color(&mut self, topic: impl ToString, level: u8, color: RGBA) {
-        self.topics
-            .entry(topic.to_string())
-            .or_default()
-            .colors
-            .insert(level, color);
-    }
-
-    /// 设置话题容量
-    pub fn topic_set_capacity(&mut self, topic: impl ToString, capacity: u32) {
-        self.topics.entry(topic.to_string()).or_default().capacity = capacity;
-    }
-
-    /// 设置话题容量
-    pub fn topic_set_focus(&mut self, topic: impl ToString, focus: u32) {
-        self.topics.entry(topic.to_string()).or_default().focus = focus;
-    }
-
-    /// 清空话题缓存
-    pub fn topic_clear(&mut self, topic: impl ToString) {
-        match self.topics.entry(topic.to_string()) {
-            Entry::Occupied(mut entry) => {
-                let topic = entry.get_mut();
-                topic.clear = true;
-                topic.vertex.clear();
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(TopicBody {
-                    clear: true,
-                    ..Default::default()
-                });
-            }
-        }
-    }
-
-    /// 保存顶点
-    pub fn topic_push(&mut self, topic: impl ToString, vertex: Vertex) {
-        self.topics
-            .entry(topic.to_string())
-            .or_default()
-            .vertex
-            .push(vertex);
-    }
-
     /// 编码
     pub fn encode(self) -> Vec<u8> {
         let mut buf = Vec::new();
@@ -173,6 +147,39 @@ impl Encoder {
             }
         }
         buf
+    }
+}
+
+impl<'a> TopicEncoder<'a> {
+    /// 设置话题颜色
+    #[inline]
+    pub fn set_color(&mut self, level: u8, color: RGBA) {
+        self.0.colors.insert(level, color);
+    }
+
+    /// 设置话题容量
+    #[inline]
+    pub fn set_capacity(&mut self, capacity: u32) {
+        self.0.capacity = capacity;
+    }
+
+    /// 设置关注数量
+    #[inline]
+    pub fn set_focus(&mut self, focus: u32) {
+        self.0.focus = focus;
+    }
+
+    /// 清空话题缓存
+    #[inline]
+    pub fn clear(&mut self) {
+        self.0.vertex.clear();
+        self.0.clear = true;
+    }
+
+    /// 保存顶点
+    #[inline]
+    pub fn push(&mut self, vertex: Vertex) {
+        self.0.vertex.push(vertex);
     }
 }
 
@@ -215,13 +222,13 @@ fn send() {
     {
         let mut encoder = Encoder::default();
         encoder.camera(Camera::AUTO);
-        encoder.topic_set_capacity("test", 20000);
-        encoder.topic_set_focus("test", 200);
-        encoder.topic_clear("test");
-        // encoder.sync_set("test", &["test"], Some(Duration::from_secs(1)));
+        let mut test = encoder.topic("test");
+        test.set_capacity(200000);
+        test.set_focus(200);
+        test.clear();
         for i in 0..255 {
             let color: [u8; 4] = rng.gen::<Srgba>().into_format().into_raw();
-            encoder.topic_set_color("test", i, RGBA(color[0], color[1], color[2], color[3]))
+            test.set_color(i, RGBA(color[0], color[1], color[2], color[3]));
         }
         let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
     }
@@ -229,20 +236,20 @@ fn send() {
     for i in 0 as u64.. {
         use std::{f32::consts::PI, thread};
         let mut encoder = Encoder::default();
-        let theta = (i as f32).powf(1.1) * PI * 1e-2;
-        let (sin, cos) = theta.sin_cos();
-        encoder.topic_push(
-            "test",
-            Vertex {
+        let mut test = encoder.topic("test");
+        for j in 0..500 {
+            let theta = ((i * 500 + j) as f32).powf(1.1) * PI * 1e-2;
+            let (sin, cos) = theta.sin_cos();
+            test.push(Vertex {
                 x: 0.1 * theta * cos,
                 y: 0.1 * theta * sin,
                 dir: f32::NAN,
-                level: (i / 50) as u8,
+                level: (i ^ j) as u8,
                 tie: true,
                 _zero: 0,
-            },
-        );
+            });
+        }
         let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(200));
     }
 }
