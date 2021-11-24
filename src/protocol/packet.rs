@@ -1,5 +1,6 @@
-﻿use super::{Camera, Visible, RGBA};
+﻿use super::{Camera, Visible};
 use crate::Vertex;
+use palette::{rgb::channels::Argb, Packed, Srgba};
 use std::{collections::HashMap, time::Duration};
 
 #[derive(Default)]
@@ -25,7 +26,7 @@ struct TopicBody {
     clear: bool,
     capacity: u32,
     focus: u32,
-    colors: HashMap<u8, RGBA>,
+    colors: HashMap<u8, u32>,
     vertex: Vec<Vertex>,
 }
 
@@ -153,8 +154,10 @@ impl Encoder {
 impl<'a> TopicEncoder<'a> {
     /// 设置话题颜色
     #[inline]
-    pub fn set_color(&mut self, level: u8, color: RGBA) {
-        self.0.colors.insert(level, color);
+    pub fn set_color(&mut self, level: u8, color: Srgba) {
+        self.0
+            .colors
+            .insert(level, Packed::<Argb>::from(color.into_format()).color);
     }
 
     /// 设置话题容量
@@ -212,7 +215,7 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Ve
 
 #[test]
 fn send() {
-    use palette::{Pixel, Srgba};
+    use palette::Srgba;
     use rand::{thread_rng, Rng};
     use std::net::UdpSocket;
 
@@ -227,8 +230,7 @@ fn send() {
         test.set_focus(200);
         test.clear();
         for i in 0..255 {
-            let color: [u8; 4] = rng.gen::<Srgba>().into_format().into_raw();
-            test.set_color(i, RGBA(color[0], color[1], color[2], color[3]));
+            test.set_color(i, rng.gen::<Srgba>());
         }
         let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
     }

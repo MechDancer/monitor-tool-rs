@@ -10,11 +10,6 @@ mod packet;
 #[cfg(feature = "sender")]
 pub use packet::*;
 
-/// 颜色
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub struct RGBA(pub u8, pub u8, pub u8, pub u8);
-
 /// 摄像机设置
 #[repr(C)]
 pub struct Camera {

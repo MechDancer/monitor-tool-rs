@@ -1,6 +1,7 @@
-﻿use super::{Camera, Visible, RGBA};
+﻿use super::{Camera, Visible};
 use crate::{Figure, Vertex};
-use iced::Color;
+use palette::rgb::channels::Argb;
+use palette::{Pixel, Srgba};
 use std::time::{Duration, Instant};
 
 mod sync_sets_and_layers;
@@ -127,8 +128,9 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
                 Some(colors) => {
                     for color in colors {
                         let level = color[0];
-                        let rgba = unsafe { *(color[1..].as_ptr() as *const RGBA) };
-                        topic.set_color(level, rgba_to_color(rgba));
+                        let rgba = unsafe { *(color[1..].as_ptr() as *const u32) };
+                        let rgba: [f32; 4] = Srgba::from_u32::<Argb>(rgba).into_format().into_raw();
+                        topic.set_color(level, rgba.into());
                     }
                 }
                 None => return,
@@ -156,14 +158,4 @@ fn update_camera(figure: &mut Figure, camera: &Camera) {
         scale_y,
     } = *camera;
     figure.set_view(x, y, scale_x, scale_y);
-}
-
-#[inline]
-fn rgba_to_color(rgba: RGBA) -> Color {
-    Color {
-        r: rgba.0 as f32 / 255.0,
-        g: rgba.1 as f32 / 255.0,
-        b: rgba.2 as f32 / 255.0,
-        a: rgba.3 as f32 / 255.0,
-    }
 }
