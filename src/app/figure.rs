@@ -23,6 +23,7 @@ pub(crate) struct Figure {
     update_time: Instant,
     print_time: bool,
 
+    pub dark_mode: bool,
     pub auto_view: bool,
     view: View,
 
@@ -56,6 +57,7 @@ impl Figure {
             update_time: Instant::now(),
             print_time: true,
 
+            dark_mode: true,
             auto_view: false,
             view: View::DEFAULT,
 
@@ -167,10 +169,14 @@ impl Figure {
             .collect::<Vec<_>>();
         let mut geometries = Vec::with_capacity(tasks.len() + 1);
         // 绘制边框
-        geometries.push(
-            self.border_cache
-                .draw(self.view.size, |frame| border(frame, Color::BLACK)),
-        );
+        let dark_mode = self.dark_mode;
+        geometries.push(self.border_cache.draw(self.view.size, |frame| {
+            if dark_mode {
+                border(frame, Color::BLACK, Color::from_rgba(1.0, 1.0, 1.0, 0.1));
+            } else {
+                border(frame, Color::WHITE, Color::BLACK);
+            }
+        }));
         // 收集异步绘图结果
         geometries.extend(
             tasks

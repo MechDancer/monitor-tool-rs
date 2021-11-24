@@ -7,10 +7,13 @@ use async_std::{
 use iced::{
     canvas::{event, Cursor, Event, Frame, Geometry, Program},
     futures::stream::{repeat_with, BoxStream},
-    keyboard, mouse, Point, Rectangle, Vector,
+    keyboard, mouse, Color, Point, Rectangle, Vector,
 };
 use iced_futures::subscription::Recipe;
-use std::time::Instant;
+use std::{
+    sync::atomic::{AtomicBool, Ordering::Relaxed},
+    time::Instant,
+};
 
 #[derive(Clone)]
 pub struct FigureProgram {
@@ -18,6 +21,7 @@ pub struct FigureProgram {
     pub state: (Rectangle, Vec<Geometry>),
     bounds: Arc<Mutex<Rectangle>>,
     anchor: Arc<Mutex<Anchor>>,
+    dark_mode: Arc<AtomicBool>,
 }
 
 /// 订阅新近完成的图像缓存
@@ -48,6 +52,7 @@ impl FigureProgram {
             state: Default::default(),
             bounds: Default::default(),
             anchor: Default::default(),
+            dark_mode: Arc::new(AtomicBool::new(true)),
         }
     }
 
@@ -148,12 +153,17 @@ impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
             }
         }
         if let Some(p) = as_available(bounds, cursor) {
+            let color = if self.dark_mode.load(Relaxed) {
+                Color::WHITE
+            } else {
+                Color::BLACK
+            };
             // 画光标
             let mut frame = Frame::new(bounds.size());
-            mark_cross(&mut frame, bounds, p, self.state.0);
+            mark_cross(&mut frame, bounds, p, self.state.0, color);
             // 画候选框
             if anchor.which == Some(mouse::Button::Right) {
-                mark_anchor(&mut frame, anchor.pos, p);
+                mark_anchor(&mut frame, anchor.pos, p, color);
             }
             geometries.push(frame.into_geometry());
         }

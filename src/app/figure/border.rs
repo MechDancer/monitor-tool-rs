@@ -11,18 +11,21 @@ pub(super) fn available_size(size: Size) -> Size {
 }
 
 #[inline]
-pub(super) fn border(frame: &mut Frame, color: Color) {
-    let Size { width, height } = frame.size();
+pub(super) fn border(frame: &mut Frame, backbround: Color, foreground: Color) {
+    let size = frame.size();
+    if backbround != Color::WHITE {
+        frame.fill(&Path::rectangle(Point::ORIGIN, size), backbround);
+    }
     frame.stroke(
         &Path::rectangle(
             BORDER_OFFSET,
             Size {
-                width: width - BORDER_OFFSET.x * 2.0,
-                height: height - BORDER_OFFSET.y * 2.0,
+                width: size.width - BORDER_OFFSET.x * 2.0,
+                height: size.height - BORDER_OFFSET.y * 2.0,
             },
         ),
         Stroke {
-            color,
+            color: foreground,
             width: 2.0,
             ..Default::default()
         },
@@ -55,7 +58,13 @@ macro_rules! line {
     };
 }
 
-pub(crate) fn mark_cross(frame: &mut Frame, bounds: Rectangle, p: Point, rectangle: Rectangle) {
+pub(crate) fn mark_cross(
+    frame: &mut Frame,
+    bounds: Rectangle,
+    p: Point,
+    rectangle: Rectangle,
+    color: Color,
+) {
     let size = bounds.size();
     let Size { width, height } = size;
     let p = p - Vector {
@@ -70,7 +79,7 @@ pub(crate) fn mark_cross(frame: &mut Frame, bounds: Rectangle, p: Point, rectang
             y: 4.0,
         },
         24.0,
-        Color::BLACK,
+        color,
     );
     text(
         frame,
@@ -80,17 +89,17 @@ pub(crate) fn mark_cross(frame: &mut Frame, bounds: Rectangle, p: Point, rectang
             y: p.y - 24.0,
         },
         24.0,
-        Color::BLACK,
+        color,
     );
-    line!(frame; (0.0, p.y) => (p.x - 20.0, p.y       ); Color::BLACK);
-    line!(frame; (p.x, 0.0) => (p.x       , p.y - 18.0); Color::BLACK);
-    line!(frame; (p.x + 20.0, p.y       ) => (width - BORDER_OFFSET.x,  p.y); Color::BLACK);
-    line!(frame; (p.x       , p.y + 22.0) => (p.x, height - BORDER_OFFSET.y); Color::BLACK);
+    line!(frame; (0.0, p.y) => (p.x - 20.0, p.y       ); color);
+    line!(frame; (p.x, 0.0) => (p.x       , p.y - 18.0); color);
+    line!(frame; (p.x + 20.0, p.y       ) => (width - BORDER_OFFSET.x,  p.y); color);
+    line!(frame; (p.x       , p.y + 22.0) => (p.x, height - BORDER_OFFSET.y); color);
 }
 
-pub(crate) fn mark_anchor(frame: &mut Frame, p0: Point, p1: Point) {
-    line!(frame; (p0.x, p0.y) => (p0.x, p1.y); Color::BLACK);
-    line!(frame; (p0.x, p0.y) => (p1.x, p0.y); Color::BLACK);
+pub(crate) fn mark_anchor(frame: &mut Frame, p0: Point, p1: Point, color: Color) {
+    line!(frame; (p0.x, p0.y) => (p0.x, p1.y); color);
+    line!(frame; (p0.x, p0.y) => (p1.x, p0.y); color);
 }
 
 #[inline]
