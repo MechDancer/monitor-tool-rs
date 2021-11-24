@@ -8,7 +8,7 @@ readme = "README.md"
 [dependencies]
 palette = "*"
 rand = { version = "*", optional = true }
-iced = { version = "*", optional = true, features = [
+iced = { version = "*", optional = true, default-features = false, features = [
     "glow",
     "glow_canvas",
     "async-std",
