@@ -1,5 +1,5 @@
 ﻿use super::{Camera, Visible, RGBA};
-use crate::{figure_program::Figure, Vertex};
+use crate::{Figure, Vertex};
 use iced::Color;
 use std::time::{Duration, Instant};
 

@@ -1,7 +1,6 @@
-﻿use std::time::Instant;
-
-use crate::FigureEvent;
+﻿use super::figure_program::FigureEvent;
 use async_std::{channel::Sender, net::UdpSocket, task};
+use std::time::Instant;
 
 pub fn spawn_background(port: u16, sender: Sender<FigureEvent>) {
     let sender_clone = sender.clone();

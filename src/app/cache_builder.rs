@@ -1,4 +1,5 @@
-﻿use crate::{decode, Figure, FigureEvent};
+﻿use super::{figure_program::FigureEvent, Figure};
+use crate::protocol::decode;
 use async_std::{
     channel::{unbounded, Receiver, RecvError, TryRecvError},
     task::{self, JoinHandle},

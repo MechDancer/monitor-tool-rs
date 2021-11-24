@@ -1,4 +1,5 @@
-﻿use async_std::{
+﻿use super::figure::{as_available, mark_anchor, mark_cross};
+use async_std::{
     channel::{Receiver, Sender},
     sync::{Arc, Mutex},
     task,
@@ -10,15 +11,6 @@ use iced::{
 };
 use iced_futures::subscription::Recipe;
 use std::time::Instant;
-
-mod anchor;
-mod figure;
-
-use anchor::Anchor;
-pub(crate) use figure::Figure;
-use figure::{as_available, mark_cross};
-
-use self::figure::mark_anchor;
 
 #[derive(Clone)]
 pub struct FigureProgram {
@@ -41,6 +33,12 @@ pub enum FigureEvent {
     Select(Rectangle, Point, Point),
     Packet(Instant, Vec<u8>),
     Line(String),
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+struct Anchor {
+    pub pos: Point,
+    pub which: Option<mouse::Button>,
 }
 
 impl FigureProgram {
