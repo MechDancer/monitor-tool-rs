@@ -1,16 +1,22 @@
-﻿use super::{figure_program::FigureEvent, Figure};
+﻿use super::{figure::FigureSnapshot, figure_program::FigureEvent, Figure};
 use crate::protocol::decode;
 use async_std::{
     channel::{unbounded, Receiver, RecvError, TryRecvError},
-    path::PathBuf,
     task::{self, JoinHandle},
 };
 use iced::{canvas::Geometry, Point, Rectangle};
 
-pub fn spawn_background(input: Receiver<FigureEvent>) -> Receiver<(Rectangle, Vec<Geometry>)> {
+pub fn spawn_background(
+    input: Receiver<FigureEvent>,
+    resume: Option<FigureSnapshot>,
+) -> Receiver<(Rectangle, Vec<Geometry>)> {
     let (sender, output) = unbounded();
     task::spawn(async move {
-        let mut cache = Some(Default::default());
+        let mut cache = if let Some(snapshot) = resume {
+            Some(Box::new(snapshot.into()))
+        } else {
+            Some(Default::default())
+        };
         loop {
             match input.recv().await {
                 Ok(event) => {
@@ -52,9 +58,9 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
                 match words.as_slice() {
                     ["log", "time"] => figure.set_print_time(true),
                     ["unlog", "time"] => figure.set_print_time(false),
-                    ["save"] => {
+                    ["save", name] => {
                         let snapshot = figure.snapshot();
-                        task::spawn(snapshot.save(PathBuf::from("snapshot.txt")));
+                        task::spawn(snapshot.save(format!("{}.txt", name).into()));
                     }
                     [title, "focus", num] => {
                         if let Ok(n) = num.parse() {

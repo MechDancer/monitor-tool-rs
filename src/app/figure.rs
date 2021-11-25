@@ -15,10 +15,10 @@ mod snapshot;
 
 use aabb::AABB;
 use border::{available_size, border};
-use snapshot::FigureSnapshot;
 
 pub(super) use border::{as_available, mark_anchor, mark_cross};
 pub(crate) use content::TopicContent;
+pub(crate) use snapshot::FigureSnapshot;
 
 /// 画面
 pub(crate) struct Figure {
@@ -69,6 +69,16 @@ impl Default for Figure {
 
             border_cache: Default::default(),
         }
+    }
+}
+
+impl From<FigureSnapshot> for Figure {
+    fn from(snapshot: FigureSnapshot) -> Self {
+        let mut result = Self::default();
+        for (topic, buffer) in snapshot.0 {
+            result.topics.insert(topic, Some(Box::new(buffer.into())));
+        }
+        result
     }
 }
 

@@ -27,8 +27,19 @@ enum FigureItem {
     Circle(Point, f32, Color),
 }
 
+impl From<TopicBuffer> for TopicContent {
+    #[inline]
+    fn from(buffer: TopicBuffer) -> Self {
+        Self {
+            buffer,
+            ..Default::default()
+        }
+    }
+}
+
 impl TopicContent {
     /// 构造快照
+    #[inline]
     pub fn snapshot(&self) -> TopicBuffer {
         self.buffer.clone()
     }

@@ -12,7 +12,7 @@ mod protocol;
 pub use protocol::*;
 
 /// 图形顶点
-#[derive(Clone, Copy, PartialEq, Default)]
+#[derive(Clone, Copy, PartialEq, Default, Debug)]
 #[repr(C)]
 pub struct Vertex {
     pub x: f32,       // 位置 x
@@ -24,7 +24,7 @@ pub struct Vertex {
     pub extra: f32,   // 补充数据
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Shape {
     Arrow,
     Circle,

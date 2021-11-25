@@ -1,4 +1,7 @@
-﻿use async_std::channel::{unbounded, Receiver};
+﻿use async_std::{
+    channel::{unbounded, Receiver},
+    task,
+};
 use iced::{canvas::Geometry, executor, Canvas, Command, Length::Fill, Rectangle, Subscription};
 use std::cell::Cell;
 
@@ -9,6 +12,7 @@ mod figure_program;
 
 use cache_builder::spawn_background as spawn_draw;
 use command_receiver::spawn_background as spawn_receive;
+use figure::FigureSnapshot;
 use figure_program::{CacheComplete, FigureProgram};
 
 pub(crate) use figure::Figure;
@@ -32,12 +36,19 @@ impl Application for Main {
     type Flags = Flags;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
+        let snapshot = std::env::args()
+            .skip(1)
+            .next()
+            .map(|s| FigureSnapshot::load(s.into()));
         let (sender, receiver) = unbounded();
         spawn_receive(flags.port, sender.clone());
         (
             Main {
                 title: format!("{}: {}", flags.title, flags.port),
-                painter: Cell::new(Some(spawn_draw(receiver))),
+                painter: Cell::new(Some(spawn_draw(
+                    receiver,
+                    snapshot.and_then(|f| task::block_on(f).ok()),
+                ))),
                 program: FigureProgram::new(sender),
             },
             Command::none(),
