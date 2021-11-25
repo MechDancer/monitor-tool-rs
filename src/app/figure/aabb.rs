@@ -106,6 +106,7 @@ impl std::ops::Add for AABB {
     type Output = Self;
 
     /// 合并两个范围
+    #[inline]
     fn add(mut self, rhs: Self) -> Self::Output {
         self += rhs;
         self
@@ -115,14 +116,18 @@ impl std::ops::Add for AABB {
 impl std::ops::AddAssign for AABB {
     /// 吸收另一个范围
     fn add_assign(&mut self, rhs: Self) {
-        self.absorb(Point {
-            x: rhs.min_x,
-            y: rhs.min_y,
-        });
-        self.absorb(Point {
-            x: rhs.max_x,
-            y: rhs.max_y,
-        });
+        if rhs.max_x > self.max_x {
+            self.max_x = rhs.max_x;
+        }
+        if rhs.min_x < self.min_x {
+            self.min_x = rhs.min_x;
+        }
+        if rhs.max_y > self.max_y {
+            self.max_y = rhs.max_y;
+        }
+        if rhs.min_y < self.min_y {
+            self.min_y = rhs.min_y;
+        }
     }
 }
 
