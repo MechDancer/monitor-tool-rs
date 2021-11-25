@@ -1,7 +1,7 @@
 ﻿use super::{FigureItem, Items, AABB};
 use iced::{
     canvas::{Cache, Geometry, Path, Stroke},
-    Point, Size, Vector,
+    Color, Point, Size, Vector,
 };
 
 #[derive(Default)]
@@ -76,21 +76,31 @@ impl TopicCache {
                 width: WIDTH,
                 ..Default::default()
             };
-            let mut tied = false;
-            for item in items.iter().copied() {
+            let min = 0.1 / scale.powi(2);
+            for (tie, item) in items.iter().copied() {
                 match item {
+                    FigureItem::End(p) => {
+                        draw_tie(tie, mass, p, min, |p0, color| {
+                            stroke.color = color;
+                            frame.stroke(&Path::line(p0, p), stroke);
+                        });
+                    }
                     FigureItem::Point(p, color) => {
+                        let tied = draw_tie(tie, mass, p, min, |p0, color| {
+                            stroke.color = color;
+                            frame.stroke(&Path::line(p0, p), stroke);
+                        });
                         // 小规模时一定画点
                         // 大规模时如果连了线就不画点
                         if !mass || !tied {
                             frame.fill_rectangle(p + offset, size, color);
                         }
-                        // 没有画点，标记连线已使用
-                        else {
-                            tied = false;
-                        }
                     }
                     FigureItem::Arrow(p, d, color) => {
+                        draw_tie(tie, mass, p, min, |p0, color| {
+                            stroke.color = color;
+                            frame.stroke(&Path::line(p0, p), stroke);
+                        });
                         if !mass {
                             frame.fill_rectangle(p + offset, size, color)
                         }
@@ -99,16 +109,13 @@ impl TopicCache {
                         stroke.color = color;
                         frame.stroke(&Path::line(p, p + d), stroke);
                     }
-                    FigureItem::Tie(p0, p1, color) => {
-                        // 大规模时尽量连线，否则只连足够长的线
-                        tied = mass || {
-                            let v = p0 - p1;
-                            (v.x.powi(2) + v.y.powi(2)) * scale.powi(2) > 0.1
-                        };
-                        if tied {
+                    FigureItem::Circle(c, r, color) => {
+                        draw_tie(tie, mass, c, min, |p0, color| {
                             stroke.color = color;
-                            frame.stroke(&Path::line(p0, p1), stroke);
-                        }
+                            frame.stroke(&Path::line(p0, c), stroke);
+                        });
+                        stroke.color = color;
+                        frame.stroke(&Path::circle(c, r), stroke);
                     }
                 }
             }
@@ -141,5 +148,26 @@ impl TopicCache {
             Bound::CachedVoid => self.bound = Bound::Invalid,
             _ => {}
         };
+    }
+}
+
+fn draw_tie(
+    tie: Option<(Point, Color)>,
+    mass: bool,
+    p: Point,
+    min: f32,
+    f: impl FnOnce(Point, Color) -> (),
+) -> bool {
+    if let Some((p0, color)) = tie {
+        let tied = mass || {
+            let v = p0 - p;
+            (v.x.powi(2) + v.y.powi(2)) > min
+        };
+        if tied {
+            f(p0, color);
+        }
+        tied
+    } else {
+        false
     }
 }

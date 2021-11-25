@@ -1,4 +1,5 @@
 ﻿use super::{super::convert, FigureItem, Vertex, AABB};
+use crate::Shape::*;
 use iced::{Color, Point};
 use std::{
     collections::{vec_deque::Iter, HashMap, VecDeque},
@@ -7,17 +8,17 @@ use std::{
 
 /// 产生绘图对象的迭代器
 pub(super) struct Items<'a> {
-    memory: IterMemory,
+    memory: Option<TieMemory>,
     center: Point,
     aabb: AABB,
     iter: Iter<'a, (Instant, Vertex)>,
     color_map: &'a mut HashMap<u8, Color>,
 }
 
-/// 迭代绘图缓存
-enum IterMemory {
-    Vertex(Point, f32, Color),
-    Position(Point),
+struct TieMemory {
+    pos: Point,
+    inside: bool,
+    color: Color,
 }
 
 impl<'a> Items<'a> {
@@ -27,61 +28,63 @@ impl<'a> Items<'a> {
         center: Point,
         aabb: AABB,
     ) -> Option<Self> {
-        let mut iter = queue.iter();
-        iter.next().map(|(_, v)| Items {
-            memory: IterMemory::Vertex(
-                convert(v.pos(), center),
-                -v.dir,
-                *color_map.entry(v.level).or_insert(Color::BLACK),
-            ),
-            center,
-            aabb,
-            iter,
-            color_map,
-        })
+        if queue.is_empty() {
+            None
+        } else {
+            Some(Items {
+                memory: None,
+                center,
+                aabb,
+                iter: queue.iter(),
+                color_map,
+            })
+        }
+    }
+
+    #[inline]
+    fn find_color(&mut self, level: u8) -> Color {
+        *self.color_map.entry(level).or_insert(Color::BLACK)
     }
 }
 
 impl<'a> Iterator for Items<'a> {
-    type Item = FigureItem;
+    type Item = (Option<(Point, Color)>, FigureItem);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.memory {
-                IterMemory::Vertex(pos, dir, color) => {
-                    self.memory = IterMemory::Position(pos);
-                    if self.aabb.contains(pos) {
-                        return if dir.is_nan() {
-                            Some(FigureItem::Point(pos, color))
-                        } else {
-                            Some(FigureItem::Arrow(pos, dir, color))
-                        };
-                    }
+            if let Some((_, v)) = self.iter.next() {
+                let pos = convert(v.pos(), self.center);
+                let inside = self.aabb.contains(pos);
+                let tie = self.memory.take();
+                if v.alpha > 0 {
+                    let mut color = self.find_color(v.level);
+                    color.a *= v.alpha as f32 / 255.0;
+                    self.memory = Some(TieMemory { pos, inside, color });
                 }
-                IterMemory::Position(p0) => {
-                    let p = self.iter.next();
-                    if p.is_none() {
-                        return None;
-                    }
-                    let v = p.unwrap().1;
-                    let color = *self.color_map.entry(v.level).or_insert(Color::BLACK);
-                    let pos = convert(v.pos(), self.center);
-                    if v.tie {
-                        self.memory = IterMemory::Vertex(pos, -v.dir, color);
-                        if self.aabb.contains(p0) || self.aabb.contains(pos) {
-                            return Some(FigureItem::Tie(p0, pos, color));
-                        }
-                    } else {
-                        self.memory = IterMemory::Position(pos);
-                        if self.aabb.contains(pos) {
-                            return if v.dir.is_nan() {
-                                Some(FigureItem::Point(pos, color))
+                if inside {
+                    let color = self.find_color(v.level);
+                    let tie = tie.map(|mem| (mem.pos, mem.color));
+                    match v.shape {
+                        Arrow => {
+                            if v.extra.is_finite() {
+                                return Some((tie, FigureItem::Arrow(pos, -v.extra, color)));
                             } else {
-                                Some(FigureItem::Arrow(pos, -v.dir, color))
-                            };
+                                return Some((tie, FigureItem::Point(pos, color)));
+                            }
+                        }
+                        Circle => {
+                            if v.extra.is_normal() {
+                                return Some((tie, FigureItem::Circle(pos, v.extra, color)));
+                            }
                         }
                     }
+                } else if let Some(tie) =
+                    tie.filter(|mem| mem.inside).map(|mem| (mem.pos, mem.color))
+                {
+                    return Some((Some(tie), FigureItem::End(pos)));
                 }
+            } else {
+                return None;
             }
         }
     }

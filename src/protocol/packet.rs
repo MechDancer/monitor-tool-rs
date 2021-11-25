@@ -215,6 +215,7 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Ve
 
 #[test]
 fn send() {
+    use crate::Shape;
     use palette::Srgba;
     use rand::{thread_rng, Rng};
     use std::net::UdpSocket;
@@ -245,10 +246,11 @@ fn send() {
             test.push(Vertex {
                 x: 0.1 * theta * cos,
                 y: 0.1 * theta * sin,
-                dir: f32::NAN,
-                level: (i ^ j) as u8,
-                tie: true,
                 _zero: 0,
+                shape: Shape::Arrow,
+                extra: f32::NAN,
+                level: (i ^ j) as u8,
+                alpha: 255,
             });
         }
         let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");

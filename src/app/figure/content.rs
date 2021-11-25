@@ -26,9 +26,10 @@ pub(crate) struct TopicContent {
 /// 单个绘图对象
 #[derive(Clone, Copy)]
 enum FigureItem {
+    End(Point),
     Point(Point, Color),
     Arrow(Point, f32, Color),
-    Tie(Point, Point, Color),
+    Circle(Point, f32, Color),
 }
 
 impl Default for TopicContent {
