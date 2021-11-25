@@ -1,5 +1,6 @@
 ﻿use crate::{Shape, Vertex};
 use iced::{Point, Size};
+use std::cmp::Ordering::*;
 
 /// 用外边界表示的范围盒子
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -81,9 +82,54 @@ impl AABB {
         }
     }
 
+    /// 判断包含关系
     #[inline]
-    pub fn contains(&self, p: Point) -> bool {
-        self.min_x <= p.x && p.x <= self.max_x && self.min_y <= p.y && p.y <= self.max_y
+    pub fn contains(&self, v: &Vertex) -> bool {
+        match v.shape {
+            Shape::Arrow => {
+                self.min_x <= v.x && v.x <= self.max_x && self.min_y <= v.y && v.y <= self.max_y
+            }
+            Shape::Circle => {
+                let x = if v.x < self.min_x {
+                    Less
+                } else if v.x <= self.max_x {
+                    Equal
+                } else {
+                    Greater
+                };
+                let y = if v.y < self.min_y {
+                    Less
+                } else if v.y <= self.max_y {
+                    Equal
+                } else {
+                    Greater
+                };
+                #[inline]
+                fn check_coner(x0: f32, y0: f32, x1: f32, y1: f32, r: f32) -> bool {
+                    (x0 - x1).hypot(y0 - y1) <= r.powi(2)
+                }
+                match (x, y) {
+                    (Less, Less) => check_coner(self.min_x, self.min_y, v.x, v.y, v.extra),
+                    (Less, Equal) => self.min_x <= v.x + v.extra,
+                    (Less, Greater) => check_coner(self.min_x, self.max_y, v.x, v.y, v.extra),
+                    (Equal, Less) => self.min_y <= v.y + v.extra,
+                    (Equal, Equal) => true,
+                    (Equal, Greater) => self.max_y >= v.y - v.extra,
+                    (Greater, Less) => check_coner(self.max_x, self.min_y, v.x, v.y, v.extra),
+                    (Greater, Equal) => self.max_x >= v.x - v.extra,
+                    (Greater, Greater) => check_coner(self.max_x, self.max_y, v.x, v.y, v.extra),
+                }
+            }
+        }
+    }
+
+    /// 判断包含关系
+    #[inline]
+    pub fn intersect(&self, others: Self) -> bool {
+        self.min_x <= others.max_x
+            && others.min_x <= self.max_x
+            && self.min_y <= others.max_y
+            && others.min_y <= self.max_y
     }
 
     /// 吸收一个点，可能扩大盒范围
@@ -93,7 +139,6 @@ impl AABB {
         } else if p.x < self.min_x {
             self.min_x = p.x;
         }
-
         if p.y > self.max_y {
             self.max_y = p.y;
         } else if p.y < self.min_y {

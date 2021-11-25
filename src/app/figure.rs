@@ -147,11 +147,8 @@ impl Figure {
             x: self.view.size.width,
             y: self.view.size.height,
         } * (0.5 / self.view.scale);
-        let aabb = AABB::foreach([
-            convert(self.view.center - diagonal, self.view.center),
-            convert(self.view.center + diagonal, self.view.center),
-        ])
-        .unwrap();
+        let aabb =
+            AABB::foreach([self.view.center - diagonal, self.view.center + diagonal]).unwrap();
         let view = self.view;
         // 写入配置并绘制
         let tasks = self

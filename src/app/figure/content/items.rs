@@ -51,41 +51,36 @@ impl<'a> Iterator for Items<'a> {
     type Item = (Option<(Point, Color)>, FigureItem);
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some((_, v)) = self.iter.next() {
-                let pos = convert(v.pos(), self.center);
-                let inside = self.aabb.contains(pos);
-                let tie = self.memory.take();
-                if v.alpha > 0 {
-                    let mut color = self.find_color(v.level);
-                    color.a *= v.alpha as f32 / 255.0;
-                    self.memory = Some(TieMemory { pos, inside, color });
-                }
-                if inside {
-                    let color = self.find_color(v.level);
-                    let tie = tie.map(|mem| (mem.pos, mem.color));
-                    match v.shape {
-                        Arrow => {
-                            if v.extra.is_finite() {
-                                return Some((tie, FigureItem::Arrow(pos, -v.extra, color)));
-                            } else {
-                                return Some((tie, FigureItem::Point(pos, color)));
-                            }
-                        }
-                        Circle => {
-                            if v.extra.is_normal() {
-                                return Some((tie, FigureItem::Circle(pos, v.extra, color)));
-                            }
+        while let Some((_, v)) = self.iter.next() {
+            let inside = self.aabb.contains(&v);
+            let pos = convert(v.pos(), self.center);
+            let tie = self.memory.take();
+            if v.alpha > 0 {
+                let mut color = self.find_color(v.level);
+                color.a *= v.alpha as f32 / 255.0;
+                self.memory = Some(TieMemory { pos, inside, color });
+            }
+            if inside {
+                let color = self.find_color(v.level);
+                let tie = tie.map(|mem| (mem.pos, mem.color));
+                match v.shape {
+                    Arrow => {
+                        if v.extra.is_finite() {
+                            return Some((tie, FigureItem::Arrow(pos, -v.extra, color)));
+                        } else {
+                            return Some((tie, FigureItem::Point(pos, color)));
                         }
                     }
-                } else if let Some(tie) =
-                    tie.filter(|mem| mem.inside).map(|mem| (mem.pos, mem.color))
-                {
-                    return Some((Some(tie), FigureItem::End(pos)));
+                    Circle => {
+                        if v.extra.is_normal() {
+                            return Some((tie, FigureItem::Circle(pos, v.extra, color)));
+                        }
+                    }
                 }
-            } else {
-                return None;
+            } else if let Some(tie) = tie.filter(|mem| mem.inside).map(|mem| (mem.pos, mem.color)) {
+                return Some((Some(tie), FigureItem::End(pos)));
             }
         }
+        return None;
     }
 }
