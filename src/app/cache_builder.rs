@@ -2,6 +2,7 @@
 use crate::protocol::decode;
 use async_std::{
     channel::{unbounded, Receiver, RecvError, TryRecvError},
+    path::PathBuf,
     task::{self, JoinHandle},
 };
 use iced::{canvas::Geometry, Point, Rectangle};
@@ -9,7 +10,7 @@ use iced::{canvas::Geometry, Point, Rectangle};
 pub fn spawn_background(input: Receiver<FigureEvent>) -> Receiver<(Rectangle, Vec<Geometry>)> {
     let (sender, output) = unbounded();
     task::spawn(async move {
-        let mut cache = Some(Box::new(Figure::new()));
+        let mut cache = Some(Default::default());
         loop {
             match input.recv().await {
                 Ok(event) => {
@@ -51,6 +52,10 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
                 match words.as_slice() {
                     ["log", "time"] => figure.set_print_time(true),
                     ["unlog", "time"] => figure.set_print_time(false),
+                    ["save"] => {
+                        let snapshot = figure.snapshot();
+                        task::spawn(snapshot.save(PathBuf::from("snapshot.txt")));
+                    }
                     [title, "focus", num] => {
                         if let Ok(n) = num.parse() {
                             if let Some(topic) = figure.get_topic(&title.to_string()) {

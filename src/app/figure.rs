@@ -11,9 +11,11 @@ use std::{
 mod aabb;
 mod border;
 mod content;
+mod snapshot;
 
 use aabb::AABB;
 use border::{available_size, border};
+use snapshot::FigureSnapshot;
 
 pub(super) use border::{as_available, mark_anchor, mark_cross};
 pub(crate) use content::TopicContent;
@@ -51,11 +53,11 @@ macro_rules! unwrap {
     };
 }
 
-impl Figure {
-    pub fn new() -> Self {
+impl Default for Figure {
+    fn default() -> Self {
         Self {
             update_time: Instant::now(),
-            print_time: true,
+            print_time: false,
 
             dark_mode: true,
             auto_view: false,
@@ -67,6 +69,19 @@ impl Figure {
 
             border_cache: Default::default(),
         }
+    }
+}
+
+impl Figure {
+    /// 构造快照
+    pub fn snapshot(&self) -> FigureSnapshot {
+        FigureSnapshot(
+            self.topics
+                .iter()
+                .filter(|(_, content)| check_visible(&self.visible_layers, content))
+                .map(|(name, content)| (name.clone(), content.as_ref().unwrap().snapshot()))
+                .collect(),
+        )
     }
 
     /// 设置视角
