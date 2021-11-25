@@ -1,4 +1,6 @@
-﻿use super::{FigureItem, Items, AABB};
+﻿use crate::Vertex;
+
+use super::{FigureItem, Items, AABB};
 use iced::{
     canvas::{Cache, Geometry, Path, Stroke},
     Color, Point, Size, Vector,
@@ -27,12 +29,12 @@ impl Default for Bound {
 
 impl TopicCache {
     /// 计算范围
-    pub fn aabb(&mut self, iter: impl Iterator<Item = Point>) -> Option<AABB> {
+    pub fn aabb(&mut self, iter: impl Iterator<Item = Vertex>) -> Option<AABB> {
         match self.bound {
             Bound::Cached(aabb) => Some(aabb),
             Bound::CachedVoid => None,
             Bound::Suspectable(old) => {
-                if let Some(new) = AABB::foreach(iter.take(self.focus_len)) {
+                if let Some(new) = AABB::foreach_vertex(iter.take(self.focus_len)) {
                     self.bound = Bound::Cached(new);
                     if new != old {
                         self.redraw();
@@ -44,7 +46,7 @@ impl TopicCache {
                     None
                 }
             }
-            Bound::Invalid => AABB::foreach(iter.take(self.focus_len)).map(|aabb| {
+            Bound::Invalid => AABB::foreach_vertex(iter.take(self.focus_len)).map(|aabb| {
                 self.bound = Bound::Cached(aabb);
                 self.redraw();
                 aabb

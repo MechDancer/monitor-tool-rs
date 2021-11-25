@@ -1,4 +1,5 @@
-﻿use iced::{Point, Size};
+﻿use crate::{Shape, Vertex};
+use iced::{Point, Size};
 
 /// 用外边界表示的范围盒子
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -21,6 +22,26 @@ impl From<Point> for AABB {
     }
 }
 
+impl From<Vertex> for AABB {
+    /// 从一个点生成无限小的盒
+    fn from(v: Vertex) -> Self {
+        match v.shape {
+            Shape::Arrow => Self {
+                min_x: v.x,
+                max_x: v.x,
+                min_y: v.y,
+                max_y: v.y,
+            },
+            Shape::Circle => Self {
+                min_x: v.x - v.extra,
+                max_x: v.x + v.extra,
+                min_y: v.y - v.extra,
+                max_y: v.y + v.extra,
+            },
+        }
+    }
+}
+
 impl AABB {
     /// 计算一组点的 AABB 盒
     pub fn foreach(iter: impl IntoIterator<Item = Point>) -> Option<Self> {
@@ -28,6 +49,16 @@ impl AABB {
         iter.next().map(|front| {
             let mut aabb = AABB::from(front);
             iter.for_each(|p| aabb.absorb(p));
+            aabb
+        })
+    }
+
+    /// 计算一组点的 AABB 盒
+    pub fn foreach_vertex(iter: impl IntoIterator<Item = Vertex>) -> Option<Self> {
+        let mut iter = iter.into_iter();
+        iter.next().map(|front| {
+            let mut aabb = AABB::from(front);
+            iter.for_each(|v| aabb += Self::from(v));
             aabb
         })
     }
@@ -76,6 +107,14 @@ impl std::ops::Add for AABB {
 
     /// 合并两个范围
     fn add(mut self, rhs: Self) -> Self::Output {
+        self += rhs;
+        self
+    }
+}
+
+impl std::ops::AddAssign for AABB {
+    /// 吸收另一个范围
+    fn add_assign(&mut self, rhs: Self) {
         self.absorb(Point {
             x: rhs.min_x,
             y: rhs.min_y,
@@ -84,7 +123,6 @@ impl std::ops::Add for AABB {
             x: rhs.max_x,
             y: rhs.max_y,
         });
-        self
     }
 }
 
