@@ -1,12 +1,11 @@
-﻿use crate::Vertex;
-
-use super::content::TopicBuffer;
+﻿use super::content::TopicBuffer;
+use crate::Vertex;
 use async_std::{
-    fs::File,
+    fs::{create_dir_all, File},
     io::{BufReader, WriteExt},
     path::PathBuf,
 };
-use iced::futures::AsyncBufReadExt;
+use iced::{futures::AsyncBufReadExt, Point};
 use palette::{rgb::channels::Argb, Packed, Pixel, Srgba};
 use std::{collections::HashMap, time::Instant};
 
@@ -43,6 +42,9 @@ macro_rules! some_or_break {
 
 impl FigureSnapshot {
     pub async fn save(self, path: PathBuf) -> std::io::Result<()> {
+        if let Some(dir) = path.parent() {
+            create_dir_all(dir).await?;
+        }
         let mut file = File::create(path).await?;
         for (topic, buffer) in self.0 {
             // 名字
@@ -79,13 +81,16 @@ impl FigureSnapshot {
         Ok(())
     }
 
-    pub async fn load(path: PathBuf) -> std::io::Result<Self> {
+    pub async fn load(path: PathBuf) -> std::io::Result<(Point, Self)> {
         let file = File::open(path).await?;
         let mut reader = BufReader::new(file);
 
         let mut result = HashMap::<String, TopicBuffer>::new();
         let mut line = String::new();
         let now = Instant::now();
+        let mut cx: f32 = 0.0;
+        let mut cy: f32 = 0.0;
+        let mut cn: usize = 0;
         loop {
             let topic = result.entry(read_line!(reader => line).into()).or_default();
             {
@@ -119,10 +124,19 @@ impl FigureSnapshot {
                     let data = some_or_break!(data);
                     let data = unsafe { &*(&data as *const _ as *const Vertex) };
                     topic.queue.push_back((now, *data));
+                    cx += data.x;
+                    cy += data.y;
+                    cn += 1;
                 }
             }
             read_line!(reader => line);
         }
-        Ok(Self(result))
+        Ok((
+            Point {
+                x: cx / cn as f32,
+                y: cy / cn as f32,
+            },
+            Self(result),
+        ))
     }
 }

@@ -8,12 +8,14 @@ use iced::{canvas::Geometry, Point, Rectangle};
 
 pub fn spawn_background(
     input: Receiver<FigureEvent>,
-    resume: Option<FigureSnapshot>,
+    resume: Option<(Point, FigureSnapshot)>,
 ) -> Receiver<(Rectangle, Vec<Geometry>)> {
     let (sender, output) = unbounded();
     task::spawn(async move {
-        let mut cache = if let Some(snapshot) = resume {
-            Some(Box::new(snapshot.into()))
+        let mut cache = if let Some((center, snapshot)) = resume {
+            let mut result = Box::new(Figure::from(snapshot));
+            result.set_view(center.x, center.y, f32::NAN, f32::NAN);
+            Some(result)
         } else {
             Some(Default::default())
         };
@@ -58,9 +60,9 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
                 match words.as_slice() {
                     ["log", "time"] => figure.set_print_time(true),
                     ["unlog", "time"] => figure.set_print_time(false),
-                    ["save", name] => {
+                    ["save", path] => {
                         let snapshot = figure.snapshot();
-                        task::spawn(snapshot.save(format!("{}.txt", name).into()));
+                        task::spawn(snapshot.save(path.into()));
                     }
                     ["goto", coordinate] => {
                         let mut coordinate = coordinate.split(',');
