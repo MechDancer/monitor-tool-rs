@@ -11,6 +11,34 @@ mod protocol;
 #[cfg(feature = "sender")]
 pub use protocol::*;
 
+#[macro_export]
+macro_rules! vertex {
+    ($level:expr; $x:expr, $y:expr; $shape:ident, $extra:expr; $tie:expr) => {
+        monitor_tool::Vertex {
+            x: $x,
+            y: $y,
+            level: $level,
+            alpha: $tie,
+            _zero: 0,
+            shape: monitor_tool::Shape::$shape,
+            extra: $extra,
+        }
+    };
+    ($level:expr; $x:expr, $y:expr; $alpha:expr) => {
+        vertex!($level; $x, $y; Arrow, f32::NAN; $alpha)
+    };
+}
+
+#[macro_export]
+macro_rules! rgba {
+    ($named:ident; $alpha:expr) => {
+        palette::Srgba {
+            color: palette::named::$named.into_format(),
+            alpha: $alpha,
+        }
+    };
+}
+
 /// 图形顶点
 #[derive(Clone, Copy, PartialEq, Default, Debug)]
 #[repr(C)]

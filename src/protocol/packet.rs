@@ -53,7 +53,25 @@ impl Encoder {
     /// 立即编码
     #[inline]
     pub fn with_topic(&mut self, topic: impl ToString, f: impl FnOnce(TopicEncoder) -> ()) {
-        f(self.topic(topic.to_string()))
+        f(self.topic(topic.to_string()));
+    }
+
+    /// 配置话题
+    pub fn config_topic(
+        &mut self,
+        topic: impl ToString,
+        capacity: u32,
+        focus: u32,
+        colors: &[(u8, Srgba)],
+        f: impl FnOnce(TopicEncoder) -> (),
+    ) {
+        let mut encoder = self.topic(topic.to_string());
+        encoder.set_capacity(capacity);
+        encoder.set_focus(focus);
+        for (level, color) in colors {
+            encoder.set_color(*level, *color);
+        }
+        f(encoder);
     }
 
     /// 控制摄像机
@@ -183,6 +201,12 @@ impl<'a> TopicEncoder<'a> {
     #[inline]
     pub fn push(&mut self, vertex: Vertex) {
         self.0.vertex.push(vertex);
+    }
+
+    /// 保存一组顶点
+    #[inline]
+    pub fn extend(&mut self, vertex: impl Iterator<Item = Vertex>) {
+        vertex.for_each(|v| self.0.vertex.push(v));
     }
 }
 
