@@ -106,7 +106,7 @@ impl AABB {
                 };
                 #[inline]
                 fn check_coner(x0: f32, y0: f32, x1: f32, y1: f32, r: f32) -> bool {
-                    (x0 - x1).hypot(y0 - y1) <= r.powi(2)
+                    (x0 - x1).powi(2) + (y0 - y1).powi(2) <= r.powi(2)
                 }
                 match (x, y) {
                     (Less, Less) => check_coner(self.min_x, self.min_y, v.x, v.y, v.extra),

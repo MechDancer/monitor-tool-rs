@@ -62,6 +62,14 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
                         let snapshot = figure.snapshot();
                         task::spawn(snapshot.save(format!("{}.txt", name).into()));
                     }
+                    ["goto", coordinate] => {
+                        let mut coordinate = coordinate.split(',');
+                        let x: Option<f32> = coordinate.next().and_then(|s| s.parse().ok());
+                        let y: Option<f32> = coordinate.next().and_then(|s| s.parse().ok());
+                        if let (Some(x), Some(y)) = (x, y) {
+                            figure.set_view(x, y, f32::NAN, f32::NAN);
+                        }
+                    }
                     [title, "focus", num] => {
                         if let Ok(n) = num.parse() {
                             if let Some(topic) = figure.get_topic(&title.to_string()) {

@@ -70,8 +70,8 @@ impl FigureSnapshot {
                 } = v;
                 let alpha = alpha as f32 / 2.55;
                 let bytes = unsafe { *(&v as *const _ as *const u128) };
-                write_async!(str; format!("{:3} {:3.0}%|{:10.3} {:10.3}|{} {:7.3} /{:032x}\n",
-                                           level, alpha, x, y, shape, extra, bytes) => file)?;
+                write_async!(str; format!("{:03}|{:10.3} {:10.3}|{} {:7.3}|{:3.0}% /{:032x}\n",
+                                           level, x, y, shape, extra, alpha, bytes) => file)?;
             }
             // 空一行
             write_async!(&[b'\n'] => file)?;
@@ -114,8 +114,7 @@ impl FigureSnapshot {
                 for _ in 0..len {
                     let data = read_line!(reader => line)
                         .split('/')
-                        .skip(1)
-                        .next()
+                        .last()
                         .and_then(|s| u128::from_str_radix(s, 16).ok());
                     let data = some_or_break!(data);
                     let data = unsafe { &*(&data as *const _ as *const Vertex) };
