@@ -11,6 +11,9 @@ mod protocol;
 #[cfg(feature = "sender")]
 pub use protocol::*;
 
+#[cfg(feature = "sender")]
+pub extern crate palette;
+
 #[macro_export]
 macro_rules! vertex {
     ($level:expr; $x:expr, $y:expr; $shape:ident, $extra:expr; $tie:expr) => {

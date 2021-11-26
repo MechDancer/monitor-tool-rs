@@ -60,7 +60,7 @@ impl FigureSnapshot {
             }
             // 数据
             write_async!(str; format!("items[{}/{}]\n", buffer.queue.len(), buffer.capacity) => file)?;
-            for (_, v) in buffer.queue {
+            for (_, v) in buffer.queue.iter().rev() {
                 let Vertex {
                     x,
                     y,
@@ -70,8 +70,8 @@ impl FigureSnapshot {
                     shape,
                     extra,
                 } = v;
-                let alpha = alpha as f32 / 2.55;
-                let bytes = unsafe { *(&v as *const _ as *const u128) };
+                let alpha = *alpha as f32 / 2.55;
+                let bytes = unsafe { *(v as *const _ as *const u128) };
                 write_async!(str; format!("{:03}|{:10.3} {:10.3}|{} {:7.3}|{:3.0}% /{:032x}\n",
                                            level, x, y, shape, extra, alpha, bytes) => file)?;
             }
@@ -123,7 +123,7 @@ impl FigureSnapshot {
                         .and_then(|s| u128::from_str_radix(s, 16).ok());
                     let data = some_or_break!(data);
                     let data = unsafe { &*(&data as *const _ as *const Vertex) };
-                    topic.queue.push_back((now, *data));
+                    topic.queue.push_front((now, *data));
                     cx += data.x;
                     cy += data.y;
                     cn += 1;
