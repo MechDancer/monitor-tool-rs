@@ -7,6 +7,7 @@ readme = "README.md"
 
 [dependencies]
 palette = "*"
+image = { version = "*", optional = true }
 rand = { version = "*", optional = true }
 iced = { version = "*", optional = true, default-features = false, features = [
     "glow",
@@ -18,5 +19,5 @@ async-std = { version = "*", optional = true }
 
 [features]
 default = ["sender", "app"]
-app = ["iced", "iced_futures", "async-std"]
+app = ["iced", "iced_futures", "async-std", "image"]
 sender = ["rand", "palette/random"]

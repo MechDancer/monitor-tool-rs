@@ -1,30 +1,48 @@
 ﻿use async_std::{
-    channel::{unbounded, Receiver},
+    channel::{unbounded, Receiver, Sender},
+    net::UdpSocket,
+    path::PathBuf,
     task,
 };
-use iced::{canvas::Geometry, executor, Canvas, Command, Length::Fill, Rectangle, Subscription};
-use std::cell::Cell;
+use iced::{
+    canvas::Geometry,
+    executor,
+    window::{self, Icon},
+    Application, Canvas, Command,
+    Length::Fill,
+    Rectangle, Settings, Subscription,
+};
+use std::{cell::Cell, time::Instant};
 
 mod cache_builder;
-mod command_receiver;
 mod figure;
 mod figure_program;
 
 use cache_builder::spawn_background as spawn_draw;
-use command_receiver::spawn_background as spawn_receive;
 use figure::FigureSnapshot;
-use figure_program::{CacheComplete, FigureProgram};
+use figure_program::{CacheComplete, FigureEvent, FigureProgram};
 
 pub(crate) use figure::Figure;
-pub use iced::{Application, Settings};
 
-#[derive(Default, Debug)]
-pub struct Flags {
-    pub title: String,
-    pub port: u16,
+#[derive(Debug)]
+pub enum Flags {
+    Resume(PathBuf),
+    Realtime(String, u16),
 }
 
-pub struct Main {
+pub fn run(flags: Flags) -> iced::Result {
+    Main::run(Settings {
+        antialiasing: true,
+        flags,
+        window: window::Settings {
+            icon: icon("favicon.ico".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+}
+
+struct Main {
     title: String,
     painter: Cell<Option<Receiver<(Rectangle, Vec<Geometry>)>>>,
     program: FigureProgram,
@@ -36,23 +54,38 @@ impl Application for Main {
     type Flags = Flags;
 
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        let snapshot = std::env::args()
-            .skip(1)
-            .next()
-            .map(|s| FigureSnapshot::load(s.into()));
-        let (sender, receiver) = unbounded();
-        spawn_receive(flags.port, sender.clone());
-        (
-            Main {
-                title: format!("{}: {}", flags.title, flags.port),
-                painter: Cell::new(Some(spawn_draw(
-                    receiver,
-                    snapshot.and_then(|f| task::block_on(f).ok()),
-                ))),
-                program: FigureProgram::new(sender),
-            },
-            Command::none(),
-        )
+        match flags {
+            Flags::Realtime(title, port) => {
+                let (sender, receiver) = unbounded();
+                spawn_udp(port, sender.clone());
+                spawn_stdin(sender.clone());
+                (
+                    Main {
+                        title: format!("{}: {}", title, port),
+                        painter: Cell::new(Some(spawn_draw(receiver, None))),
+                        program: FigureProgram::new(sender),
+                    },
+                    Command::none(),
+                )
+            }
+            Flags::Resume(path) => {
+                let title = path.as_os_str().to_string_lossy().into_owned();
+                let snapshot = FigureSnapshot::load(path);
+                let (sender, receiver) = unbounded();
+                spawn_stdin(sender.clone());
+                (
+                    Main {
+                        title,
+                        painter: Cell::new(Some(spawn_draw(
+                            receiver,
+                            task::block_on(snapshot).ok(),
+                        ))),
+                        program: FigureProgram::new(sender),
+                    },
+                    Command::none(),
+                )
+            }
+        }
     }
 
     fn title(&self) -> String {
@@ -81,4 +114,42 @@ impl Application for Main {
             .height(Fill)
             .into()
     }
+}
+
+impl Default for Flags {
+    fn default() -> Self {
+        Self::Realtime("Figure1".into(), 0)
+    }
+}
+
+fn icon(path: PathBuf) -> Option<Icon> {
+    use image::GenericImageView;
+    let img = image::open(path).ok()?;
+    let (width, height) = img.dimensions();
+    let rgba = img.into_bytes();
+    Icon::from_rgba(rgba, width, height).ok()
+}
+
+fn spawn_stdin(sender: Sender<FigureEvent>) {
+    task::spawn(async move {
+        loop {
+            let mut line = String::new();
+            let _ = match async_std::io::stdin().read_line(&mut line).await {
+                Ok(0) | Err(_) => break,
+                Ok(_) => sender.send(FigureEvent::Line(line)).await,
+            };
+        }
+    });
+}
+
+fn spawn_udp(port: u16, sender: Sender<FigureEvent>) {
+    task::spawn(async move {
+        let socket = UdpSocket::bind(format!("0.0.0.0:{}", port)).await.unwrap();
+        let mut buf = Box::new([0u8; 65536]);
+        while let Ok((n, _)) = socket.recv_from(buf.as_mut()).await {
+            let _ = sender
+                .send(FigureEvent::Packet(Instant::now(), buf[..n].to_vec()))
+                .await;
+        }
+    });
 }
