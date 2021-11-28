@@ -1,11 +1,10 @@
-﻿use super::{Camera, Visible};
+﻿use super::Visible;
 use crate::Vertex;
 use palette::{rgb::channels::Argb, Packed, Srgba};
 use std::{collections::HashMap, time::Duration};
 
 #[derive(Default)]
 pub struct Encoder {
-    camera: Camera,
     sync_sets: HashMap<String, WithIndex<Duration>>,
     layers: HashMap<String, WithIndex<Visible>>,
     topics: HashMap<String, TopicBody>,
@@ -74,12 +73,6 @@ impl Encoder {
         f(encoder);
     }
 
-    /// 控制摄像机
-    #[inline]
-    pub fn camera(&mut self, camera: Camera) {
-        self.camera = camera;
-    }
-
     /// 构造话题编码器
     #[inline]
     pub fn topic<'a>(&'a mut self, topic: impl ToString) -> TopicEncoder<'a> {
@@ -138,8 +131,6 @@ impl Encoder {
     /// 编码
     pub fn encode(self) -> Vec<u8> {
         let mut buf = Vec::new();
-        // 编码摄像机配置
-        extend!(self.camera => buf);
         // 编码同步组
         sort_and_encode(&self.sync_sets, &mut buf);
         // 编码图层
@@ -249,7 +240,6 @@ fn send() {
 
     {
         let mut encoder = Encoder::default();
-        encoder.camera(Camera::AUTO);
         let mut test = encoder.topic("test");
         test.set_capacity(200000);
         test.set_focus(200);

@@ -1,8 +1,6 @@
 ﻿#[cfg(feature = "app")]
 mod app;
 
-use std::fmt::Display;
-
 #[cfg(feature = "app")]
 pub use app::*;
 
@@ -61,24 +59,13 @@ pub enum Shape {
     Circle,
 }
 
-impl Vertex {
-    #[cfg(feature = "app")]
-    #[inline]
-    pub fn pos(&self) -> iced::Point {
-        iced::Point {
-            x: self.x,
-            y: self.y,
-        }
-    }
-}
-
 impl Default for Shape {
     fn default() -> Self {
         Self::Arrow
     }
 }
 
-impl Display for Shape {
+impl std::fmt::Display for Shape {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             &Self::Arrow => write!(f, "arrow "),

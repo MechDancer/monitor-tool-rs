@@ -35,7 +35,7 @@ pub fn run(flags: Flags) -> iced::Result {
         antialiasing: true,
         flags,
         window: window::Settings {
-            icon: icon("favicon.ico".into()),
+            icon: load_icon("favicon.ico".into()),
             ..Default::default()
         },
         ..Default::default()
@@ -118,11 +118,12 @@ impl Application for Main {
 
 impl Default for Flags {
     fn default() -> Self {
-        Self::Realtime("Figure1".into(), 0)
+        Self::Realtime("".into(), 0)
     }
 }
 
-fn icon(path: PathBuf) -> Option<Icon> {
+/// 加载图标
+fn load_icon(path: PathBuf) -> Option<Icon> {
     use image::GenericImageView;
     let img = image::open(path).ok()?;
     let (width, height) = img.dimensions();
@@ -130,6 +131,7 @@ fn icon(path: PathBuf) -> Option<Icon> {
     Icon::from_rgba(rgba, width, height).ok()
 }
 
+/// 启动命令行解析
 fn spawn_stdin(sender: Sender<FigureEvent>) {
     task::spawn(async move {
         loop {
@@ -142,6 +144,7 @@ fn spawn_stdin(sender: Sender<FigureEvent>) {
     });
 }
 
+/// 启动 UDP 接收
 fn spawn_udp(port: u16, sender: Sender<FigureEvent>) {
     task::spawn(async move {
         let socket = UdpSocket::bind(format!("0.0.0.0:{}", port)).await.unwrap();

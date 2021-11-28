@@ -53,7 +53,7 @@ impl<'a> Iterator for Items<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, v)) = self.iter.next() {
             let inside = self.aabb.contains(&v);
-            let pos = convert(v.pos(), self.center);
+            let pos = convert(Point { x: v.x, y: v.y }, self.center);
             let tie = self.memory.take();
             if v.alpha > 0 {
                 let mut color = self.find_color(v.level);

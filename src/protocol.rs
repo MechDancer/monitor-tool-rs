@@ -10,40 +10,6 @@ mod packet;
 #[cfg(feature = "sender")]
 pub use packet::*;
 
-/// 摄像机设置
-#[repr(C)]
-pub struct Camera {
-    x: f32,       // 中心点横坐标
-    y: f32,       // 中心点纵坐标
-    scale_x: f32, // TODO 应该改为宽
-    scale_y: f32, // TODO 应该改为高
-}
-
-impl Default for Camera {
-    #[inline]
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-impl Camera {
-    /// 不控制摄像机
-    pub const DEFAULT: Self = Self {
-        x: f32::NAN,
-        y: f32::NAN,
-        scale_x: f32::NAN,
-        scale_y: f32::NAN,
-    };
-
-    /// 摄像机自动
-    pub const AUTO: Self = Self {
-        x: f32::NAN,
-        y: f32::NAN,
-        scale_x: 0.0,
-        scale_y: 0.0,
-    };
-}
-
 /// 图层是否显示
 enum Visible {
     NothingToDo = 0,

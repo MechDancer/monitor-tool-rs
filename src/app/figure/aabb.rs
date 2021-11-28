@@ -123,7 +123,7 @@ impl AABB {
         }
     }
 
-    /// 判断包含关系
+    /// 判断是否相交
     #[inline]
     pub fn intersect(&self, others: Self) -> bool {
         self.min_x <= others.max_x

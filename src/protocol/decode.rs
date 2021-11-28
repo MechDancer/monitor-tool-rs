@@ -1,4 +1,4 @@
-﻿use super::{Camera, Visible};
+﻿use super::Visible;
 use crate::{Figure, Vertex};
 use palette::rgb::channels::Argb;
 use palette::{Pixel, Srgba};
@@ -50,11 +50,6 @@ macro_rules! read_by_tails {
 }
 
 pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
-    // 解析摄像机
-    match read!(buf => Camera) {
-        Some(camera) => update_camera(figure, camera),
-        None => return,
-    }
     // 解析同步组
     let sync_sets = read_by_tails!(buf => SyncSets);
     for i in 0..sync_sets.len() {
@@ -147,15 +142,4 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
             None => return,
         }
     }
-}
-
-#[inline]
-fn update_camera(figure: &mut Figure, camera: &Camera) {
-    let Camera {
-        x,
-        y,
-        scale_x,
-        scale_y,
-    } = *camera;
-    figure.set_view(x, y, scale_x, scale_y);
 }
