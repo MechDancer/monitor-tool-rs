@@ -199,6 +199,16 @@ impl<'a> TopicEncoder<'a> {
     pub fn extend(&mut self, vertex: impl Iterator<Item = Vertex>) {
         vertex.for_each(|v| self.0.vertex.push(v));
     }
+
+    /// 保存多边形
+    #[inline]
+    pub fn push_polygon(&mut self, mut vertex: impl Iterator<Item = Vertex>) {
+        if let Some(begin) = vertex.next() {
+            self.0.vertex.push(Vertex { alpha: 0, ..begin });
+            vertex.for_each(|v| self.0.vertex.push(v));
+            self.0.vertex.push(begin);
+        }
+    }
 }
 
 /// 从已排序的集合编码
