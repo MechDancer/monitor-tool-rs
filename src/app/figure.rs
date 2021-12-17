@@ -30,7 +30,7 @@ pub(crate) struct Figure {
     view: View,
 
     topics: HashMap<String, Option<Box<TopicContent>>>,
-    visible_layers: HashSet<String>,
+    hidden_layers: HashSet<String>,
     sync_sets: HashMap<String, (HashSet<String>, Duration)>,
 
     border_cache: Cache,
@@ -64,7 +64,7 @@ impl Default for Figure {
             view: View::DEFAULT,
 
             topics: Default::default(),
-            visible_layers: Default::default(),
+            hidden_layers: Default::default(),
             sync_sets: Default::default(),
 
             border_cache: Default::default(),
@@ -88,7 +88,7 @@ impl Figure {
         FigureSnapshot(
             self.topics
                 .iter()
-                .filter(|(_, content)| check_visible(&self.visible_layers, content))
+                .filter(|(_, content)| check_visible(&self.hidden_layers, content))
                 .map(|(name, content)| (name.clone(), content.as_ref().unwrap().snapshot()))
                 .collect(),
         )
@@ -179,7 +179,7 @@ impl Figure {
         let tasks = self
             .topics
             .iter_mut()
-            .filter(|(_, content)| check_visible(&self.visible_layers, content))
+            .filter(|(_, content)| check_visible(&self.hidden_layers, content))
             .map(|(topic, content)| {
                 let topic = topic.clone();
                 let mut content = content.take().unwrap();
@@ -229,9 +229,9 @@ impl Figure {
     /// 设置图层可见性
     pub fn set_visible(&mut self, layer: impl ToString, visible: bool) {
         if visible {
-            self.visible_layers.insert(layer.to_string());
+            self.hidden_layers.remove(&layer.to_string());
         } else {
-            self.visible_layers.remove(&layer.to_string());
+            self.hidden_layers.insert(layer.to_string());
         }
     }
 
@@ -291,7 +291,7 @@ impl Figure {
     fn aabb(&mut self) -> Option<AABB> {
         self.topics
             .values_mut()
-            .filter(|content| check_visible(&self.visible_layers, content))
+            .filter(|content| check_visible(&self.hidden_layers, content))
             .filter_map(|content| unwrap!(mut; content).aabb())
             .reduce(|sum, it| sum + it)
     }
@@ -339,7 +339,7 @@ impl Figure {
 #[inline]
 fn check_visible(set: &HashSet<String>, content: &Option<Box<TopicContent>>) -> bool {
     let layer = &unwrap!(content).layer;
-    layer.is_empty() || set.contains(layer)
+    layer.is_empty() || !set.contains(layer)
 }
 
 #[inline]
