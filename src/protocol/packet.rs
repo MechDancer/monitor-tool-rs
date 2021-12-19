@@ -196,25 +196,27 @@ impl<'a> TopicEncoder<'a> {
 
     /// 保存一组顶点
     #[inline]
-    pub fn extend(&mut self, vertex: impl Iterator<Item = Vertex>) {
-        vertex.for_each(|v| self.0.vertex.push(v));
+    pub fn extend(&mut self, vertex: impl IntoIterator<Item = Vertex>) {
+        vertex.into_iter().for_each(|v| self.0.vertex.push(v));
     }
 
     /// 保存折线
     #[inline]
-    pub fn extend_polyline(&mut self, mut vertex: impl Iterator<Item = Vertex>) {
-        if let Some(begin) = vertex.next() {
+    pub fn extend_polyline(&mut self, vertex: impl IntoIterator<Item = Vertex>) {
+        let mut iter = vertex.into_iter();
+        if let Some(begin) = iter.next() {
             self.0.vertex.push(Vertex { alpha: 0, ..begin });
-            vertex.for_each(|v| self.0.vertex.push(v));
+            iter.for_each(|v| self.0.vertex.push(v));
         }
     }
 
     /// 保存多边形
     #[inline]
-    pub fn extend_polygon(&mut self, mut vertex: impl Iterator<Item = Vertex>) {
-        if let Some(begin) = vertex.next() {
+    pub fn extend_polygon(&mut self, vertex: impl IntoIterator<Item = Vertex>) {
+        let mut iter = vertex.into_iter();
+        if let Some(begin) = iter.next() {
             self.0.vertex.push(Vertex { alpha: 0, ..begin });
-            vertex.for_each(|v| self.0.vertex.push(v));
+            iter.for_each(|v| self.0.vertex.push(v));
             self.0.vertex.push(begin);
         }
     }
