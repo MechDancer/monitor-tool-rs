@@ -16,8 +16,8 @@ pub extern crate palette;
 macro_rules! vertex {
     ($level:expr; $x:expr, $y:expr; $shape:ident, $extra:expr; $tie:expr) => {
         monitor_tool::Vertex {
-            x: $x,
-            y: $y,
+            x: $x as f32,
+            y: $y as f32,
             level: $level,
             alpha: $tie,
             _zero: 0,
