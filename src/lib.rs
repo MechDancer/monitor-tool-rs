@@ -28,6 +28,9 @@ macro_rules! vertex {
     ($level:expr; $x:expr, $y:expr; $alpha:expr) => {
         vertex!($level; $x, $y; Arrow, f32::NAN; $alpha)
     };
+    ($level:expr; $x:expr, $y:expr => $theta:expr; $alpha:expr) => {
+        vertex!($level; $x, $y; Arrow, $theta; $alpha)
+    };
 }
 
 #[macro_export]
