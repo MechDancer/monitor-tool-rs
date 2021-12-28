@@ -10,6 +10,8 @@
 
 渲染基于 [iced](https://github.com/iced-rs/iced)。
 
-![video](README.mp4)
+<video width="1504" height="1000" controls>
+  <source src="video.mov" type="video/mp4">
+</video>
 
 ## 使用说明
