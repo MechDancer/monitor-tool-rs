@@ -6,10 +6,10 @@ pub use app::*;
 
 mod protocol;
 
-#[cfg(feature = "sender")]
+#[cfg(feature = "client")]
 pub use protocol::*;
 
-#[cfg(feature = "sender")]
+#[cfg(feature = "client")]
 pub extern crate palette;
 
 #[macro_export]

@@ -4,11 +4,11 @@ mod decode;
 #[cfg(feature = "app")]
 pub(crate) use decode::decode;
 
-#[cfg(feature = "sender")]
-mod packet;
+#[cfg(feature = "client")]
+mod encode;
 
-#[cfg(feature = "sender")]
-pub use packet::*;
+#[cfg(feature = "client")]
+pub use encode::*;
 
 /// 图层是否显示
 enum Visible {
