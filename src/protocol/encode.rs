@@ -260,15 +260,16 @@ fn send() {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
     {
-        let mut encoder = Encoder::default();
-        let mut test = encoder.topic("test");
-        test.set_capacity(200000);
-        test.set_focus(200);
-        test.clear();
+        let mut colors = Vec::with_capacity(256);
         for i in 0..255 {
-            test.set_color(i, rng.gen::<Srgba>());
+            colors.push((i, rng.gen::<Srgba>()));
         }
-        let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
+        let _ = socket.send_to(
+            &Encoder::with(|encoder| {
+                encoder.config_topic("test", 200000, 200, &colors, |_| {});
+            }),
+            "127.0.0.1:12345",
+        );
     }
 
     for i in 0 as u64.. {
