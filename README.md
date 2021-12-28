@@ -32,6 +32,13 @@ cargo run --release -- 图2 23333
 
 ![效果图](readme/f0.png)
 
+### 交互操作
+
+- **空格**启动自动调整视野
+- **按住左键**拖动画布
+- **按住右键**框选视野
+- **滚轮**以指针位置为中心缩放画布
+
 ### 发送
 
 数据源项目在 `Cargo.toml` 中依赖此项目。
@@ -42,40 +49,33 @@ monitor-tool = { path = "../monitor-tool-rs", default-features = false, features
 ] }
 ```
 
-调用编码器编码图形并发送（示例在[此文件](src/protocol/encoder.rs)末尾）。
+调用编码器编码图形并发送（示例在[此文件](src/protocol/encode.rs)末尾）。
 
 ```rust
-  {
+const TOPIC: &str = "test";
+let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+let _ = socket.connect("127.0.0.1:12345");
+
+{
+    let mut rng = thread_rng();
     let mut colors = Vec::with_capacity(256);
     for i in 0..255 {
         colors.push((i, rng.gen::<Srgba>()));
     }
-    let _ = socket.send_to(
-        &Encoder::with(|encoder| {
-            encoder.config_topic("test", 200000, 200, &colors, |_| {});
-        }),
-        "127.0.0.1:12345",
-    );
+    let _ = socket.send(&Encoder::with(|encoder| {
+        encoder.config_topic(TOPIC, 200000, 200, &colors, |_| {});
+    }));
 }
 
 for i in 0 as u64.. {
-    use std::{f32::consts::PI, thread};
     let mut encoder = Encoder::default();
-    let mut test = encoder.topic("test");
+    let mut topic = encoder.topic(TOPIC);
     for j in 0..500 {
         let theta = ((i * 500 + j) as f32).powf(1.1) * PI * 1e-2;
         let (sin, cos) = theta.sin_cos();
-        test.push(Vertex {
-            x: 0.1 * theta * cos,
-            y: 0.1 * theta * sin,
-            _zero: 0,
-            shape: Shape::Arrow,
-            extra: f32::NAN,
-            level: (i ^ j) as u8,
-            alpha: 255,
-        });
+        topic.push(vertex!((i ^ j) as u8; 0.1 * theta * cos, 0.1 * theta * sin; 255));
     }
-    let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
+    let _ = socket.send(&encoder.encode());
     thread::sleep(Duration::from_millis(200));
 }
 ```

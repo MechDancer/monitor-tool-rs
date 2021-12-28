@@ -251,45 +251,36 @@ fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Ve
 
 #[test]
 fn send() {
-    use crate::Shape;
+    use crate::{vertex, Shape};
     use palette::Srgba;
     use rand::{thread_rng, Rng};
     use std::net::UdpSocket;
+    use std::{f32::consts::PI, thread};
 
-    let mut rng = thread_rng();
+    const TOPIC: &str = "test";
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+    let _ = socket.connect("127.0.0.1:12345");
 
     {
+        let mut rng = thread_rng();
         let mut colors = Vec::with_capacity(256);
         for i in 0..255 {
             colors.push((i, rng.gen::<Srgba>()));
         }
-        let _ = socket.send_to(
-            &Encoder::with(|encoder| {
-                encoder.config_topic("test", 200000, 200, &colors, |_| {});
-            }),
-            "127.0.0.1:12345",
-        );
+        let _ = socket.send(&Encoder::with(|encoder| {
+            encoder.config_topic(TOPIC, 200000, 200, &colors, |_| {});
+        }));
     }
 
     for i in 0 as u64.. {
-        use std::{f32::consts::PI, thread};
         let mut encoder = Encoder::default();
-        let mut test = encoder.topic("test");
+        let mut topic = encoder.topic(TOPIC);
         for j in 0..500 {
             let theta = ((i * 500 + j) as f32).powf(1.1) * PI * 1e-2;
             let (sin, cos) = theta.sin_cos();
-            test.push(Vertex {
-                x: 0.1 * theta * cos,
-                y: 0.1 * theta * sin,
-                _zero: 0,
-                shape: Shape::Arrow,
-                extra: f32::NAN,
-                level: (i ^ j) as u8,
-                alpha: 255,
-            });
+            topic.push(vertex!((i ^ j) as u8; 0.1 * theta * cos, 0.1 * theta * sin; 255));
         }
-        let _ = socket.send_to(&encoder.encode(), "127.0.0.1:12345");
+        let _ = socket.send(&encoder.encode());
         thread::sleep(Duration::from_millis(200));
     }
 }
