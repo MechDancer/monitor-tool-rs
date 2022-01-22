@@ -11,26 +11,26 @@ mod encode;
 pub use encode::*;
 
 /// 图层是否显示
-enum Visible {
+enum Visibility {
     NothingToDo = 0,
     Visible = 0x55,
     Invisible = 0xaa,
 }
 
-impl Default for Visible {
+impl Default for Visibility {
     #[inline]
     fn default() -> Self {
         Self::NothingToDo
     }
 }
 
-impl From<Option<bool>> for Visible {
+impl From<Option<bool>> for Visibility {
     #[inline]
     fn from(v: Option<bool>) -> Self {
         match v {
-            None => Visible::NothingToDo,
-            Some(true) => Visible::Visible,
-            Some(false) => Visible::Invisible,
+            None => Visibility::NothingToDo,
+            Some(true) => Visibility::Visible,
+            Some(false) => Visibility::Invisible,
         }
     }
 }

@@ -158,7 +158,7 @@ fn draw_tie(
     mass: bool,
     p: Point,
     min: f32,
-    f: impl FnOnce(Point, Color) -> (),
+    f: impl FnOnce(Point, Color),
 ) -> bool {
     if let Some((p0, color)) = tie {
         let tied = mass || {

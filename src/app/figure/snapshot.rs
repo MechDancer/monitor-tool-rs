@@ -30,9 +30,16 @@ macro_rules! read_line {
     }};
 }
 
-macro_rules! some_or_break {
-    ($option:expr) => {{
+macro_rules! unwarp_or_break {
+    (op; $option:expr) => {{
         if let Some(x) = $option {
+            x
+        } else {
+            break;
+        }
+    }};
+    (re; $option:expr) => {{
+        if let Ok(x) = $option {
             x
         } else {
             break;
@@ -96,32 +103,34 @@ impl FigureSnapshot {
             {
                 let str = read_line!(reader => line);
                 let str = str.trim_start_matches("colors[");
-                let str = str.trim_end_matches("]");
-                let len: usize = some_or_break!(str.parse().ok());
+                let str = str.trim_end_matches(']');
+                let len: usize = unwarp_or_break!(re; str.parse());
                 for _ in 0..len {
                     let mut str = read_line!(reader => line).split('|');
-                    let level = some_or_break!(str.next().and_then(|s| s.parse::<u8>().ok()));
+                    let level = unwarp_or_break!(op; str.next().and_then(|s| s.parse::<u8>().ok()));
                     let color: Option<[f32; 4]> = str
                         .next()
                         .and_then(|s| u32::from_str_radix(s.trim_start_matches("0x"), 16).ok())
                         .map(|c| Srgba::from_u32::<Argb>(c).into_format().into_raw());
-                    topic.color_map.insert(level, some_or_break!(color).into());
+                    topic
+                        .color_map
+                        .insert(level, unwarp_or_break!(op; color).into());
                 }
             }
             {
                 let str = read_line!(reader => line);
                 let str = str.trim_start_matches("items[");
-                let str = str.trim_end_matches("]");
+                let str = str.trim_end_matches(']');
                 let mut str = str.split('/');
-                let len: usize = some_or_break!(str.next().and_then(|s| s.parse().ok()));
-                topic.capacity = some_or_break!(str.next().and_then(|s| s.parse().ok()));
+                let len: usize = unwarp_or_break!(op; str.next().and_then(|s| s.parse().ok()));
+                topic.capacity = unwarp_or_break!(op; str.next().and_then(|s| s.parse().ok()));
                 topic.queue.reserve(len);
                 for _ in 0..len {
                     let data = read_line!(reader => line)
                         .split('/')
                         .last()
                         .and_then(|s| u128::from_str_radix(s, 16).ok());
-                    let data = some_or_break!(data);
+                    let data = unwarp_or_break!(op; data);
                     let data = unsafe { &*(&data as *const _ as *const Vertex) };
                     topic.queue.push_front((now, *data));
                     cx += data.x;

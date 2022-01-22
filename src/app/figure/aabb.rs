@@ -3,6 +3,7 @@ use iced::{Point, Size};
 use std::cmp::Ordering::*;
 
 /// 用外边界表示的范围盒子
+#[allow(clippy::upper_case_acronyms)]
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub struct AABB {
     min_x: f32,
@@ -124,6 +125,7 @@ impl AABB {
     }
 
     /// 判断是否相交
+    #[allow(dead_code)]
     #[inline]
     pub fn intersect(&self, others: Self) -> bool {
         self.min_x <= others.max_x

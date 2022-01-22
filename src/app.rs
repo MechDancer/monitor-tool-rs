@@ -42,9 +42,11 @@ pub fn run(flags: Flags) -> iced::Result {
     })
 }
 
+type Painter = Cell<Option<Receiver<(Rectangle, Vec<Geometry>)>>>;
+
 struct Main {
     title: String,
-    painter: Cell<Option<Receiver<(Rectangle, Vec<Geometry>)>>>,
+    painter: Painter,
     program: FigureProgram,
 }
 
@@ -96,7 +98,7 @@ impl Application for Main {
         self.painter
             .take()
             .map(|r| Subscription::from_recipe(CacheComplete(r)))
-            .unwrap_or(Subscription::none())
+            .unwrap_or_else(Subscription::none)
     }
 
     fn update(

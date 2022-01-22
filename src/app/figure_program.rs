@@ -79,17 +79,13 @@ impl Program<(Rectangle, Vec<Geometry>)> for FigureProgram {
         use keyboard::{Event::*, KeyCode::Space};
         use mouse::{Button::*, Event::*, ScrollDelta};
         match event {
-            event::Event::Keyboard(keyboard_event) => match keyboard_event {
-                KeyPressed {
-                    key_code,
-                    modifiers: _,
-                } => {
-                    if key_code == Space {
-                        self.send(FigureEvent::Auto);
-                    }
-                }
-                _ => {}
-            },
+            event::Event::Keyboard(KeyPressed {
+                key_code: Space,
+                modifiers: _,
+            }) => {
+                self.send(FigureEvent::Auto);
+            }
+            event::Event::Keyboard(_) => {}
             event::Event::Mouse(mouse_event) => match mouse_event {
                 WheelScrolled {
                     delta: ScrollDelta::Lines { x: _, y } | ScrollDelta::Pixels { x: _, y },

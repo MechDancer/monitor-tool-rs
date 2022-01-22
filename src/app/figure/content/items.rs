@@ -52,7 +52,7 @@ impl<'a> Iterator for Items<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some((_, v)) = self.iter.next() {
-            let inside = self.aabb.contains(&v);
+            let inside = self.aabb.contains(v);
             let pos = convert(Point { x: v.x, y: v.y }, self.center);
             let tie = self.memory.take();
             if v.alpha > 0 {
@@ -81,6 +81,6 @@ impl<'a> Iterator for Items<'a> {
                 return Some((Some(tie), FigureItem::End(pos)));
             }
         }
-        return None;
+        None
     }
 }

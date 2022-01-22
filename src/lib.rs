@@ -70,9 +70,9 @@ impl Default for Shape {
 
 impl std::fmt::Display for Shape {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            &Self::Arrow => write!(f, "arrow "),
-            &Self::Circle => write!(f, "circle"),
+        match *self {
+            Self::Arrow => write!(f, "arrow "),
+            Self::Circle => write!(f, "circle"),
         }
     }
 }

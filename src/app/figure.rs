@@ -200,15 +200,12 @@ impl Figure {
             }
         }));
         // 收集异步绘图结果
-        geometries.extend(
-            tasks
-                .into_iter()
-                .map(|handle| task::block_on(handle))
-                .filter_map(|(name, content, geometry)| {
-                    *self.topics.get_mut(&name).unwrap() = Some(content);
-                    geometry
-                }),
-        );
+        geometries.extend(tasks.into_iter().map(task::block_on).filter_map(
+            |(name, content, geometry)| {
+                *self.topics.get_mut(&name).unwrap() = Some(content);
+                geometry
+            },
+        ));
         self.timer(time);
         (
             Rectangle {
@@ -236,7 +233,7 @@ impl Figure {
     }
 
     /// 重新关联同步组
-    pub fn update_sync_set(&mut self, sync_set: &String, topic: String) {
+    pub fn update_sync_set(&mut self, sync_set: &str, topic: String) {
         let set = &mut self.sync_sets.get_mut(sync_set).unwrap().0;
         if sync_set.is_empty() {
             set.remove(&topic);
@@ -246,14 +243,14 @@ impl Figure {
     }
 
     /// 获取话题对象
-    pub fn put_topic<'a>(&'a mut self, topic: impl ToString) -> &'a mut TopicContent {
+    pub fn put_topic(&mut self, topic: impl ToString) -> &mut TopicContent {
         unwrap!(mut; self.topics
             .entry(topic.to_string())
-            .or_insert(Some(Default::default())))
+            .or_insert_with(|| Some(Default::default())))
     }
 
     /// 获取话题对象
-    pub fn get_topic<'a>(&'a mut self, topic: &String) -> Option<&'a mut Box<TopicContent>> {
+    pub fn get_topic<'a>(&'a mut self, topic: &str) -> Option<&'a mut Box<TopicContent>> {
         self.topics.get_mut(topic).map(|c| unwrap!(mut; c))
     }
 

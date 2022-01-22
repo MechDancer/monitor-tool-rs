@@ -1,4 +1,4 @@
-﻿use super::Visible;
+﻿use super::Visibility;
 use crate::Vertex;
 use palette::{rgb::channels::Argb, Packed, Srgba};
 use std::{collections::HashMap, time::Duration};
@@ -6,7 +6,7 @@ use std::{collections::HashMap, time::Duration};
 #[derive(Default)]
 pub struct Encoder {
     sync_sets: HashMap<String, WithIndex<Duration>>,
-    layers: HashMap<String, WithIndex<Visible>>,
+    layers: HashMap<String, WithIndex<Visibility>>,
     topics: HashMap<String, TopicBody>,
 }
 
@@ -30,8 +30,8 @@ struct TopicBody {
 }
 
 #[inline]
-fn bytes_of<'a, T>(t: &'a T) -> &'a [u8] {
-    unsafe { std::slice::from_raw_parts(t as *const _ as *const u8, std::mem::size_of::<T>()) }
+fn bytes_of<T>(t: &T) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(t as *const _ as *const _, std::mem::size_of::<T>()) }
 }
 
 macro_rules! extend {
@@ -43,7 +43,7 @@ macro_rules! extend {
 impl Encoder {
     /// 立即编码
     #[inline]
-    pub fn with(f: impl FnOnce(&mut Encoder) -> ()) -> Vec<u8> {
+    pub fn with(f: impl FnOnce(&mut Encoder)) -> Vec<u8> {
         let mut this = Self::default();
         f(&mut this);
         this.encode()
@@ -51,7 +51,7 @@ impl Encoder {
 
     /// 立即编码
     #[inline]
-    pub fn with_topic(&mut self, topic: impl ToString, f: impl FnOnce(TopicEncoder) -> ()) {
+    pub fn with_topic(&mut self, topic: impl ToString, f: impl FnOnce(TopicEncoder)) {
         f(self.topic(topic.to_string()));
     }
 
@@ -62,7 +62,7 @@ impl Encoder {
         capacity: u32,
         focus: u32,
         colors: &[(u8, Srgba)],
-        f: impl FnOnce(TopicEncoder) -> (),
+        f: impl FnOnce(TopicEncoder),
     ) {
         let mut encoder = self.topic(topic.to_string());
         encoder.set_capacity(capacity);
@@ -75,7 +75,7 @@ impl Encoder {
 
     /// 构造话题编码器
     #[inline]
-    pub fn topic<'a>(&'a mut self, topic: impl ToString) -> TopicEncoder<'a> {
+    pub fn topic(&mut self, topic: impl ToString) -> TopicEncoder<'_> {
         TopicEncoder(self.topics.entry(topic.to_string()).or_default())
     }
 
@@ -272,7 +272,7 @@ fn send() {
         }));
     }
 
-    for i in 0 as u64.. {
+    for i in 0u64.. {
         let mut encoder = Encoder::default();
         let mut topic = encoder.topic(TOPIC);
         for j in 0..500 {

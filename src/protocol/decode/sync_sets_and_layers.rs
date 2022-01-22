@@ -1,4 +1,4 @@
-﻿use super::Visible;
+﻿use super::Visibility;
 use std::time::Duration;
 
 #[derive(Clone, Copy)]
@@ -43,12 +43,12 @@ impl<'a> Layers<'a> {
         self.0.len()
     }
 
-    pub fn get(&self, i: usize) -> (&'a str, &'a Visible) {
+    pub fn get(&self, i: usize) -> (&'a str, &'a Visibility) {
         let slice = get_item_slice!(self, i);
         unsafe {
             (
-                std::str::from_utf8_unchecked(&slice[size_of!(Visible)..]),
-                &*(slice.as_ptr() as *const Visible),
+                std::str::from_utf8_unchecked(&slice[size_of!(Visibility)..]),
+                &*(slice.as_ptr() as *const Visibility),
             )
         }
     }

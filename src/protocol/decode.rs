@@ -1,4 +1,4 @@
-﻿use super::Visible;
+﻿use super::Visibility;
 use crate::{Figure, Vertex};
 use palette::rgb::channels::Argb;
 use palette::{Pixel, Srgba};
@@ -63,9 +63,9 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
     for i in 0..layers.len() {
         let (layer, visible) = layers.get(i);
         match *visible {
-            Visible::NothingToDo => {}
-            Visible::Visible => figure.set_visible(layer, true),
-            Visible::Invisible => figure.set_visible(layer, false),
+            Visibility::NothingToDo => {}
+            Visibility::Visible => figure.set_visible(layer, true),
+            Visibility::Invisible => figure.set_visible(layer, false),
         }
     }
     // 解析话题
