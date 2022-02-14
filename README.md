@@ -67,7 +67,7 @@ let _ = socket.connect("127.0.0.1:12345");
     }));
 }
 
-for i in 0 as u64.. {
+for i in 0u64.. {
     let mut encoder = Encoder::default();
     let mut topic = encoder.topic(TOPIC);
     for j in 0..500 {
