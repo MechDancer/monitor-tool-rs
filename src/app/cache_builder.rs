@@ -76,7 +76,7 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
                     ["hide", layer] => figure.set_visible(layer, false),
                     [topic, "focus", num] => {
                         if let Ok(n) = num.parse() {
-                            if let Some(content) = figure.get_topic(&topic.to_string()) {
+                            if let Some(content) = figure.get_topic(topic) {
                                 content.set_focus(n);
                                 println!("set focus {} for {}", n, topic);
                             }

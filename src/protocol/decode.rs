@@ -86,7 +86,7 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
             Some(0) => {}
             Some(i) => {
                 let (sync_set, _) = sync_sets.get(*i as usize - 1);
-                figure.update_sync_set(&sync_set.to_string(), title.to_string());
+                figure.update_sync_set(sync_set, title.to_string());
             }
             None => return,
         }
