@@ -14,7 +14,7 @@ iced = { version = "*", optional = true, default-features = false, features = [
     "glow_canvas",
     "async-std",
 ] }
-iced_futures = { version = "*", optional = true }
+iced_futures = { version = "0.3", optional = true }
 async-std = { version = "*", optional = true }
 
 [features]
