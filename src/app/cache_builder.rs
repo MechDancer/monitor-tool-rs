@@ -58,6 +58,7 @@ fn handle(mut figure: Box<Figure>, event: FigureEvent) -> JoinHandle<Box<Figure>
             Line(line) => {
                 let words = line.split_whitespace().collect::<Vec<_>>();
                 match words.as_slice() {
+                    ["clean"] => figure.clean(),
                     ["log", "time"] => figure.set_print_time(true),
                     ["unlog", "time"] => figure.set_print_time(false),
                     ["save", path] => {

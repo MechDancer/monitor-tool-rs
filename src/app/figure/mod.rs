@@ -259,6 +259,11 @@ impl Figure {
         self.print_time = value;
     }
 
+    /// 清空所有话题数据
+    pub fn clean(&mut self) {
+        self.topics.clear();
+    }
+
     /// 同步
     fn sync(&mut self, time: Instant) {
         for (set, life_time) in self.sync_sets.values_mut() {
