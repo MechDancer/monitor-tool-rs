@@ -1,4 +1,6 @@
-﻿#[cfg(feature = "app")]
+﻿#![deny(warnings)]
+
+#[cfg(feature = "app")]
 mod app;
 
 #[cfg(feature = "app")]
