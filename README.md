@@ -10,6 +10,12 @@
 
 渲染基于 [iced](https://github.com/iced-rs/iced)。
 
+---
+
+> 最新版编译器编译的不能收包，需要 debug。
+
+---
+
 ## 使用说明
 
 ### 显示
@@ -49,7 +55,7 @@ monitor-tool = { path = "../monitor-tool-rs", default-features = false, features
 ] }
 ```
 
-调用编码器编码图形并发送（示例在[此文件](src/protocol/encode.rs)末尾）。
+调用编码器编码图形并发送（示例在[此文件](/src/protocol/encode.rs#L253)）。
 
 ```rust
 const TOPIC: &str = "test";
