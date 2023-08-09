@@ -1,7 +1,7 @@
 ﻿use super::Visibility;
 use crate::Vertex;
 use palette::{rgb::channels::Argb, Packed, Srgba};
-use std::{collections::HashMap, time::Duration};
+use std::{alloc::Layout, collections::HashMap, time::Duration};
 
 #[derive(Default)]
 pub struct Encoder {
@@ -29,13 +29,19 @@ struct TopicBody {
     vertex: Vec<Vertex>,
 }
 
-#[inline]
-fn bytes_of<T>(t: &T) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(t as *const _ as *const _, std::mem::size_of::<T>()) }
+fn encode_val<T: Copy>(val: &T, buf: &mut Vec<u8>) {
+    let layout = Layout::for_value(val);
+    let rest = buf.len() % layout.align();
+    buf.resize(
+        buf.len() + layout.size() + if rest > 0 { layout.align() - rest } else { 0 },
+        0,
+    );
+    let offset = buf.len() - layout.size();
+    unsafe { (buf[offset..].as_mut_ptr() as *mut T).write(*val) };
 }
 
 macro_rules! extend {
-    (     $value:expr => $vec:expr) => { $vec.extend_from_slice(bytes_of(&$value)) };
+    (     $value:expr => $vec:expr) => { encode_val(&$value, $vec) };
     (str; $value:expr => $vec:expr) => { $vec.extend_from_slice($value.as_bytes()) };
     (len; $value:expr => $vec:expr) => { extend!($value as u16 => $vec) };
 }
@@ -131,29 +137,30 @@ impl Encoder {
     /// 编码
     pub fn encode(self) -> Vec<u8> {
         let mut buf = Vec::new();
+        let ref_buf: &mut Vec<u8> = &mut buf;
         // 编码同步组
-        sort_and_encode(&self.sync_sets, &mut buf);
+        sort_and_encode(&self.sync_sets, ref_buf);
         // 编码图层
-        sort_and_encode(&self.layers, &mut buf);
+        sort_and_encode(&self.layers, ref_buf);
         // 编码话题
         for (name, body) in self.topics {
-            extend!(len; name.len()    => buf);
-            extend!(str; name          => buf);
-            extend!(     body.sync_set => buf);
-            extend!(     body.layer    => buf);
-            extend!(     body.clear    => buf);
-            extend!(     body.capacity => buf);
-            extend!(     body.focus    => buf);
+            extend!(len; name.len()    => ref_buf);
+            extend!(str; name          => ref_buf);
+            extend!(     body.sync_set => ref_buf);
+            extend!(     body.layer    => ref_buf);
+            extend!(     body.clear    => ref_buf);
+            extend!(     body.capacity => ref_buf);
+            extend!(     body.focus    => ref_buf);
             // 编码颜色
-            extend!(len; body.colors.len() => buf);
+            extend!(len; body.colors.len() => ref_buf);
             for (level, rgba) in body.colors {
-                extend!(level => buf);
-                extend!(rgba  => buf);
+                extend!(level as u32 => ref_buf);
+                extend!(rgba         => ref_buf);
             }
             // 编码顶点
-            extend!(len; body.vertex.len() => buf);
+            extend!(len; body.vertex.len() => ref_buf);
             for v in body.vertex {
-                extend!(v => buf);
+                extend!(v => ref_buf);
             }
         }
         buf
@@ -223,7 +230,7 @@ impl<'a> TopicEncoder<'a> {
 }
 
 /// 从已排序的集合编码
-fn sort_and_encode<T: Default>(map: &HashMap<String, WithIndex<T>>, buf: &mut Vec<u8>) {
+fn sort_and_encode<T: Default + Copy>(map: &HashMap<String, WithIndex<T>>, buf: &mut Vec<u8>) {
     // 用 u16 保存长度
     const USIZE_LEN: usize = std::mem::size_of::<u16>();
     // 依序号排序

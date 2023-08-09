@@ -2,31 +2,41 @@
 use crate::{Figure, Vertex};
 use palette::rgb::channels::Argb;
 use palette::{Pixel, Srgba};
+use std::alloc::Layout;
 use std::time::{Duration, Instant};
 
 mod sync_sets_and_layers;
 
 use sync_sets_and_layers::*;
 
+fn read_n<T>(mut buf: &[u8], n: usize) -> Option<(&[u8], &[T])> {
+    let layout = Layout::array::<T>(n).unwrap();
+    let rest = buf.as_ptr() as usize % layout.align();
+    if rest > 0 {
+        buf = &buf[layout.align() - rest..];
+    }
+    if buf.len() >= layout.size() {
+        Some((&buf[layout.size()..], unsafe {
+            std::slice::from_raw_parts(buf.as_ptr() as *const T, n)
+        }))
+    } else {
+        None
+    }
+}
+
 macro_rules! read {
     ($buf:expr => $ty:ty) => {{
-        const LEN: usize = std::mem::size_of::<$ty>();
-        if $buf.len() >= LEN {
-            let ptr = $buf.as_ptr() as *const $ty;
-            $buf = &$buf[LEN..];
-            Some(unsafe { &*ptr })
+        if let Some((slice, val)) = read_n::<$ty>($buf, 1) {
+            $buf = slice;
+            Some(&val[0])
         } else {
             None
         }
     }};
     ($buf:expr => $ty:ty; $n:expr) => {{
-        const LEN: usize = std::mem::size_of::<$ty>();
-        let n = $n as usize;
-        let len = n * LEN;
-        if $buf.len() >= len {
-            let slice = unsafe { std::slice::from_raw_parts($buf.as_ptr() as *const $ty, n) };
-            $buf = &$buf[len..];
-            Some(slice)
+        if let Some((slice, val)) = read_n::<$ty>($buf, $n as _) {
+            $buf = slice;
+            Some(val)
         } else {
             None
         }
@@ -119,13 +129,13 @@ pub(crate) fn decode(figure: &mut Figure, time: Instant, mut buf: &[u8]) {
         // 更新颜色
         match read!(buf => u16) {
             Some(0) => {}
-            Some(n) => match read!(buf => [u8; 5]; *n) {
+            Some(n) => match read!(buf => [u32;2]; *n) {
                 Some(colors) => {
                     for color in colors {
                         let level = color[0];
-                        let rgba = unsafe { *(color[1..].as_ptr() as *const u32) };
-                        let rgba: [f32; 4] = Srgba::from_u32::<Argb>(rgba).into_format().into_raw();
-                        topic.set_color(level, rgba.into());
+                        let rgba: [f32; 4] =
+                            Srgba::from_u32::<Argb>(color[1]).into_format().into_raw();
+                        topic.set_color(level as _, rgba.into());
                     }
                 }
                 None => return,

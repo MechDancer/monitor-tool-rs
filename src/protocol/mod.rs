@@ -11,6 +11,7 @@ mod encode;
 pub use encode::*;
 
 /// 图层是否显示
+#[derive(Clone, Copy)]
 enum Visibility {
     NothingToDo = 0,
     Visible = 0x55,
