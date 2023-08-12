@@ -68,7 +68,7 @@ impl Encoder {
         capacity: u32,
         focus: u32,
         colors: &[(u8, Srgba)],
-        f: impl FnOnce(TopicEncoder),
+        f: impl FnOnce(&mut TopicEncoder),
     ) {
         let mut encoder = self.topic(topic.to_string());
         encoder.set_capacity(capacity);
@@ -76,7 +76,7 @@ impl Encoder {
         for (level, color) in colors {
             encoder.set_color(*level, *color);
         }
-        f(encoder);
+        f(&mut encoder);
     }
 
     /// 构造话题编码器

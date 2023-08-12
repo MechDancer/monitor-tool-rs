@@ -17,13 +17,13 @@ pub extern crate palette;
 #[macro_export]
 macro_rules! vertex {
     ($level:expr; $x:expr, $y:expr; $shape:ident, $extra:expr; $tie:expr) => {
-        Vertex {
+        $crate::Vertex {
             x: $x as f32,
             y: $y as f32,
             level: $level,
             alpha: $tie,
             _zero: 0,
-            shape: Shape::$shape,
+            shape: $crate::Shape::$shape,
             extra: $extra,
         }
     };
@@ -38,8 +38,8 @@ macro_rules! vertex {
 #[macro_export]
 macro_rules! rgba {
     ($named:ident; $alpha:expr) => {
-        palette::Srgba {
-            color: palette::named::$named.into_format(),
+        $crate::palette::Srgba {
+            color: $crate::palette::named::$named.into_format(),
             alpha: $alpha,
         }
     };

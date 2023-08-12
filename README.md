@@ -55,7 +55,7 @@ monitor-tool = { path = "../monitor-tool-rs", default-features = false, features
 ] }
 ```
 
-调用编码器编码图形并发送（示例在[此文件](/src/protocol/encode.rs#L253)）。
+调用编码器编码图形并发送（示例在[此文件](/src/protocol/encode.rs#L260)）。
 
 ```rust
 const TOPIC: &str = "test";
